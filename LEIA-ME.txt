@@ -1,0 +1,25 @@
+﻿Use o arquivo index.html desta pasta como substituto do seu index atual.
+
+Regra de filtro mais importante:
+- navbar = quem pode aparecer
+- r.Conta = de onde o dado veio
+- A definicao completa fica no comentario acima de escopoAtual() dentro do index.html
+
+Mapa de dependencias:
+- veja DEPENDENCIAS.md para a matriz de Meta GMV, Resumo Mensal, estado visual e invalidacao
+
+O que este pacote ajusta:
+- Confirma ativacao e pausa somente depois de a Meta responder.
+- Atualiza a tela logo em seguida, sem precisar clicar em "Atualizar Meta Ads".
+- Revalida o status em segundo plano para reconciliar a estrutura da conta.
+
+Arquivos auxiliares de Netlify foram copiados do projeto base.
+
+Antes de mexer em cache/indices, consulte DEPENDENCIAS.md e registre os casos de validacao com os numeros esperados de hoje.
+
+Casos-base para preencher antes de otimizar:
+- Data: 25/06/2026
+- Resumo Mensal / Todas: ____________________
+- Resumo Mensal / plataforma selecionada: ____________________
+- Meta GMV / conta selecionada: ____________________
+- Observacao: anotar o numero esperado antes de mudar qualquer cache.

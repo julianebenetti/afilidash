@@ -5495,7 +5495,16 @@ async function atualizarMetaStatusOrcamento() {
   }
 }
 
-// Busca insights (gasto/cliques por dia) de UMA conta Meta num range de datas customizado — sem paginar status/orçamento
+// Divide um array em lotes de tamanho maximo `tam` cada — usado para nao mandar listas de
+     // IDs grandes demais numa unica chamada de filtering do Graph API (acima de ~150-200 IDs
+     // o Meta retorna erro 500 generico, code 1 / error_subcode 99).
+     function _chunkArray(arr, tam) {
+       const lotes = [];
+       for (let i = 0; i < (arr || []).length; i += tam) lotes.push(arr.slice(i, i + tam));
+       return lotes;
+     }
+     
+     // Busca insights (gasto/cliques por dia) de UMA conta Meta num range de datas customizado — sem paginar status/orçamento
 // idsCampanhaUnica: campanhas com 1 anúncio só → busca a nível CAMPANHA (sub_id = nome da campanha)
 // idsAnuncioMultiplo: anúncios de campanhas com 2+ anúncios → busca a nível ANÚNCIO (sub_id = nome do anúncio)
 async function _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampanhaUnica, idsAnuncioMultiplo) {
@@ -5547,16 +5556,20 @@ async function _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampan
     return rows;
   }
 
-  if (temUnica) {
-    const filtering = encodeURIComponent(JSON.stringify([{ field:'campaign.id', operator:'IN', value: idsCampanhaUnica }]));
-    const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
-    await buscarPaginado(url, 'campaign_name');
-  }
-  if (temMultipla) {
-    const filtering = encodeURIComponent(JSON.stringify([{ field:'ad.id', operator:'IN', value: idsAnuncioMultiplo }]));
-    const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=ad_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=ad&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
-    await buscarPaginado(url, 'ad_name');
-  }
+    if (temUnica) {
+           for (const lote of _chunkArray(idsCampanhaUnica, 80)) {
+             const filtering = encodeURIComponent(JSON.stringify([{ field:'campaign.id', operator:'IN', value: lote }]));
+             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
+             await buscarPaginado(url, 'campaign_name');
+     }
+     }
+         if (temMultipla) {
+           for (const lote of _chunkArray(idsAnuncioMultiplo, 80)) {
+             const filtering = encodeURIComponent(JSON.stringify([{ field:'ad.id', operator:'IN', value: lote }]));
+             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=ad_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=ad&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
+             await buscarPaginado(url, 'ad_name');
+           }
+         }
 
   return rows;
 }

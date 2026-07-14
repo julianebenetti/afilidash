@@ -29,7 +29,10 @@ async function carregarConfig() {
   const res = await fetch(`${base()}/afilidash_config?chave=eq.user-config&select=valor`, {
     headers: sbHeaders(),
   });
-  if (!res.ok) throw new Error('Falha ao carregar config: HTTP ' + res.status);
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Falha ao carregar config: HTTP ${res.status} — ${txt.slice(0, 300)}`);
+  }
   const rows = await res.json();
   return rows[0]?.valor || {};
 }

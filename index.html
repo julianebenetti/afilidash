@@ -5196,6 +5196,28 @@ async function _migrarCampanhaParaAnuncioAntigo(sidCampanhaMae, sidAnuncioAntigo
   return antigas.length;
 }
 
+// Extrai a URL de destino do criativo de um anúncio Meta.
+// A API Graph (v19+) não expande object_story_spec/asset_feed_spec via fields= —
+// é preciso pedir o objeto inteiro (creative{object_story_spec,asset_feed_spec,call_to_action})
+// e extrair o link aqui no código. Tenta nesta ordem até achar um link; retorna null
+// se nenhum formato bater (esperado pra campanhas de WhatsApp click-to-chat, que não têm link).
+function _extrairLinkCreative(ad) {
+  const cr = ad && ad.creative;
+  if (!cr) return null;
+  try {
+    const oss = cr.object_story_spec;
+    if (oss?.link_data?.link) return oss.link_data.link;
+    if (oss?.link_data?.child_attachments?.[0]?.link) return oss.link_data.child_attachments[0].link; // carrossel
+    if (cr.call_to_action?.value?.link) return cr.call_to_action.value.link; // nível raiz — "impulsionar publicação"
+    if (oss?.video_data?.call_to_action?.value?.link) return oss.video_data.call_to_action.value.link; // vídeo
+    if (oss?.photo_data?.call_to_action?.value?.link) return oss.photo_data.call_to_action.value.link; // foto
+    if (cr.asset_feed_spec?.link_urls?.[0]?.website_url) return cr.asset_feed_spec.link_urls[0].website_url; // Advantage+/Dynamic Creative
+  } catch(e) {
+    console.warn('Falha ao extrair link do criativo:', e.message);
+  }
+  return null;
+}
+
 async function _buscarStatusOrcamentoMeta(contaMeta) {
   const actId = contaMeta.accountId.startsWith('act_') ? contaMeta.accountId : 'act_' + contaMeta.accountId;
   const statusMap = {};
@@ -5224,7 +5246,7 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
   const adsPorCampanha = await Promise.all(campanhas.map(async c => {
     if ((c.effective_status||'').toUpperCase() !== 'ACTIVE') return 'SKIP_INATIVA';
     try {
-      const adsUrl = `https://graph.facebook.com/v19.0/${c.id}/ads?fields=name,effective_status,adset_id,created_time&limit=500&access_token=${contaMeta.token}`;
+      const adsUrl = `https://graph.facebook.com/v19.0/${c.id}/ads?fields=name,effective_status,adset_id,created_time,creative{id,object_story_spec,asset_feed_spec,call_to_action}&limit=500&access_token=${contaMeta.token}`;
       const adsRes = await fetch(adsUrl);
       const adsJson = await adsRes.json();
       if (adsJson.error) throw new Error(adsJson.error.message);
@@ -5342,6 +5364,9 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
         CFG_CAMPANHAS[sid].meta_adset_id     = ads[0]?.adset_id || null;
         CFG_CAMPANHAS[sid].meta_nivel        = 'campanha';
         CFG_CAMPANHAS[sid].effective_status  = c.effective_status;
+        // Auto-extrai o link do criativo — só sobrescreve se achou algo; nunca apaga um
+        // link já salvo (manual ou de ciclo anterior) quando a extração não encontra nada.
+        { const _linkExt = _extrairLinkCreative(ads[0]); if (_linkExt) CFG_CAMPANHAS[sid].link = _linkExt; }
         // Limpa qualquer override local (pausar/ativar feito por aqui antes) — o status que
         // acabou de chegar da API é a verdade atual, não pode ficar presa numa marcação velha
         // pra sempre (ex: se a campanha foi reativada direto no Gerenciador do Meta).
@@ -5388,6 +5413,9 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
         CFG_CAMPANHAS[sid].meta_adset_id     = ad.adset_id || null;
         CFG_CAMPANHAS[sid].meta_nivel        = 'anuncio';
         CFG_CAMPANHAS[sid].effective_status  = ad.effective_status;
+        // Auto-extrai o link do criativo — só sobrescreve se achou algo; nunca apaga um
+        // link já salvo (manual ou de ciclo anterior) quando a extração não encontra nada.
+        { const _linkExt = _extrairLinkCreative(ad); if (_linkExt) CFG_CAMPANHAS[sid].link = _linkExt; }
         delete CFG_CAMPANHAS[sid].status_override;
         if (_campGarantirPrimeiraVigencia(sid, CFG_CAMPANHAS[sid].plataforma)) histCriado = true;
         if (orcCampanha > 0) CFG_CAMPANHAS[sid].orcamento = orcCampanha;

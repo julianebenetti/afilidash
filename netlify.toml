@@ -26,3 +26,9 @@ status = 200
 from = "/api/comissao"
 to = "/.netlify/functions/comissao"
 status = 200
+
+# Roda sozinho 4x/dia (8h, 12h, 16h, 20h em Brasília = 11h, 15h, 19h, 23h UTC).
+# Netlify Scheduled Functions rodam sempre em UTC.
+[functions."comissao-scheduled"]
+schedule = "0 11,15,19,23 * * *"
+

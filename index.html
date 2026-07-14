@@ -545,8 +545,7 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
         <tbody id="mensal-body"><tr><td colspan="12" class="empty">⏳ Carregando...</td></tr></tbody>
       </table>
     </div>
-  </div>
-</div>
+renderPedidos();">📅 Ontem</button></div>
 
 <!-- ══════════════════════════════════════════
      PÁGINA: PEDIDOS
@@ -554,9 +553,9 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
 <div class="page" id="page-pedidos">
   <div class="toolbar">
     <div style="display:flex;align-items:center;gap:10px;">
-      <button class="act-btn" onclick="document.getElementById('pedidos-data').value=_pedidosOntemKey();pedidosLimparSelecao();renderPedidos();">📅 Ontem</button>
+      <button class="act-btn" onclick="document.getElementById('pedidos-data').value=_pedidosOntemKey();pedidosLimparSelecao();document.getElementById('pedidos-data-ate').value='';renderPedidos();">📅 Ontem</button>
       <label style="font-size:12px;font-weight:600;color:var(--muted);">Data:</label>
-      <input type="date" id="pedidos-data" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;" onchange="pedidosLimparSelecao();renderPedidos()">
+      <input type="date" id="pedidos-data" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;" onchange="pedidosLimparSelecao();renderPedidos()"> <label style="font-size:12px;font-weight:600;color:var(--muted);">até:</label> <input type="date" id="pedidos-data-ate" title="Opcional — informe para ver um período de vários dias" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;" onchange="pedidosLimparSelecao();renderPedidos()">
       <div style="display:flex;align-items:center;gap:4px">
         <input class="search-box" type="text" placeholder="Buscar sub_id..." id="pedidos-busca" oninput="renderPedidos()" style="width:200px">
         <button onclick="document.getElementById('pedidos-busca').value='';renderPedidos()" title="Limpar busca"
@@ -8956,7 +8955,7 @@ async function renderPedidos() {
   let pedidosDoDia;
   if (pg) { pg.style.opacity = '0.4'; pg.style.pointerEvents = 'none'; pg.style.transition = 'opacity .2s'; }
   try {
-    pedidosDoDia = await _pedidosBuscarData(dataSelecionada);
+    pedidosDoDia = await (async()=>{const _ai=document.getElementById('pedidos-data-ate');const _ate=(_ai&&_ai.value>dataSelecionada)?_ai.value:dataSelecionada;const _ds=[];let _d=new Date(dataSelecionada+'T00:00:00');const _df=new Date(_ate+'T00:00:00');let _sf=0;while(_d<=_df&&_sf<400){_ds.push(_d.toISOString().slice(0,10));_d.setDate(_d.getDate()+1);_sf++;}const _arrs=await Promise.all(_ds.map(dt=>_pedidosBuscarData(dt).catch(()=>[])));return _arrs.flat();})();
   } catch(e) {
     console.warn('Falha ao buscar pedidos da data ' + dataSelecionada + ':', e.message);
     toast('⚠️ Falha ao buscar pedidos dessa data: ' + e.message, 'warn');
@@ -9032,7 +9031,7 @@ async function renderPedidos() {
   `).join('');
 
   const contaLabel = filtroConta ? esc(filtroConta) : 'Todas as contas';
-  document.getElementById('pedidos-sub').textContent = `${contaLabel} · ${dataSelecionada}`;
+  document.getElementById('pedidos-sub').textContent = `${contaLabel} · ${(function(){const _ai=document.getElementById('pedidos-data-ate');const _v=_ai&&_ai.value;return (_v&&_v>dataSelecionada)?(dataSelecionada+' → '+_v):dataSelecionada;})()}`;
 
   const html = pedidosDia.map(r => {
     const nomeItemTxt = r.Nome_Item ? esc(r.Nome_Item) : '<span style="color:var(--muted);">—</span>';

@@ -1622,7 +1622,7 @@ function _syncConfigServidor() {
 // Versão imediata (sem debounce) com feedback visível de sucesso/erro — pra usar em
 // momentos em que a pessoa quer ter CERTEZA visual de que salvou (ex: botão "Salvar agora"
 // no histórico de vigência), em vez de confiar silenciosamente no debounce de 1s.
-async function _salvarConfigAgora(mensagemSucesso) {
+async function _salvarConfigAgora(mensagemSucesso, silencioso = false) {
   clearTimeout(_syncTimer);
   try {
     const cfg = {
@@ -1645,9 +1645,10 @@ async function _salvarConfigAgora(mensagemSucesso) {
       body: JSON.stringify(cfg),
     });
     if (!res.ok) throw new Error('servidor respondeu ' + res.status);
-    toast(mensagemSucesso || '✓ Configuração salva no servidor', 'ok');
+    if (!silencioso) toast(mensagemSucesso || '✓ Configuração salva no servidor', 'ok');
   } catch(e) {
-    toast('⚠️ Falha ao salvar no servidor: ' + e.message + ' — não confie, tenta de novo antes de fechar a página', 'warn');
+    if (!silencioso) toast('⚠️ Falha ao salvar no servidor: ' + e.message + ' — não confie, tenta de novo antes de fechar a página', 'warn');
+    else console.warn('Falha ao salvar config antes da checagem de comissão:', e.message);
   }
 }
 
@@ -5518,8 +5519,34 @@ async function atualizarMetaStatusOrcamento() {
     } else {
       toast(`✓ ${totalCampanhas} campanhas verificadas${totalNovas ? ', ' + totalNovas + ' nova(s)' : ''}`, 'ok');
     }
+    _verificarComissoesAposSync(); // roda em segundo plano — não trava o botão nem o toast acima
   } finally {
     if (btn) { btn.textContent = '🔄 Atualizar Meta Ads'; btn.disabled = false; }
+  }
+}
+
+// Checa a comissão dos produtos (Fase 3) logo depois de atualizar as campanhas —
+// é aqui que os links extraídos automaticamente do criativo (Fase 1) acabaram de
+// ser salvos. Espera o servidor confirmar essa gravação (sem depender do debounce
+// de 1s do salvar() normal) antes de chamar /api/comissao, senão a checagem rodaria
+// com links desatualizados. Roda em segundo plano — falha aqui não deve travar nem
+// alarmar quem simplesmente não configurou uma conta Shopee tipo "api".
+async function _verificarComissoesAposSync() {
+  try {
+    await _salvarConfigAgora('', true);
+    const res  = await fetch('/api/comissao', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      if (!(data.error || '').includes('Nenhuma conta Shopee'))
+        console.warn('Falha na checagem de comissão:', data.error);
+      return;
+    }
+    if (data.alertas_novos > 0) {
+      toast(`⚠️ ${data.alertas_novos} produto(s) com queda de comissão!`, 'warn');
+    }
+    _carregarComissoes(); // atualiza a coluna 💰 Comissão com o resultado fresco
+  } catch(e) {
+    console.warn('Falha na checagem de comissão:', e.message);
   }
 }
 
@@ -9646,6 +9673,7 @@ function _campRenderCampanhasTabela() {
     ${thS('mes','Mês','text-align:center;min-width:65px')}
     ${thS('totalDias','Dias')}
     <th style="min-width:70px;text-align:left">Link</th>
+    <th style="min-width:80px;text-align:center">💰 Comissão</th>
     <th style="min-width:140px;text-align:left">Obs</th>
     <th style="text-align:left">Motivo Pausa</th>
     <th style="text-align:center;min-width:36px"></th>
@@ -9664,7 +9692,7 @@ function _campRenderCampanhasTabela() {
        </select>`;
   }
 
-  const ncols=10+rdDatas.length;
+  const ncols=11+rdDatas.length;
   if(!camps.length){
     if(!DADOS.length) {
       tbody.innerHTML=`<tr><td colspan="${ncols}" class="empty" style="padding:20px">⏳ Carregando...</td></tr>`;
@@ -9786,6 +9814,7 @@ function _campRenderCampanhasTabela() {
             onchange="event.stopPropagation();_campSet('${sid}','link',this.value);renderCampanhas()">
         </div>
       </td>
+      <td style="text-align:center;white-space:nowrap">${_campCelulaComissao(sid)}</td>
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:3px">
           <span style="font-size:11px;color:var(--muted);flex-shrink:0;">${(()=>{const _h=new Date();return (_h.getDate()+'').padStart(2,'0')+'/'+((_h.getMonth()+1)+'').padStart(2,'0');})()}</span>
@@ -9945,6 +9974,72 @@ function adicionarCampanha() {
 }
 
 // Toggle alerta manual
+// ═══════════════════════════════════════════
+// MONITOR DE COMISSÃO POR PRODUTO (Fase 3/4)
+// Lê o resultado gravado pela function /api/comissao em shopee_comissao_cache.
+// COMISSAO_MAP fica indexado por sub_id — cada campanha aponta pra 1 produto.
+// ═══════════════════════════════════════════
+let COMISSAO_MAP = {};
+let _comissaoCarregada = false;
+let _comissaoCarregando = false;
+
+async function _carregarComissoes() {
+  if (_comissaoCarregando) return;
+  _comissaoCarregando = true;
+  try {
+    const rows = await sbGet('/shopee_comissao_cache?select=shop_id,item_id,sub_id,comissao_atual,comissao_anterior,indisponivel,alerta_ativo,confirmado');
+    COMISSAO_MAP = {};
+    (rows || []).forEach(r => { if (r.sub_id) COMISSAO_MAP[r.sub_id] = r; });
+    _comissaoCarregada = true;
+    if (document.getElementById('page-campanhas')?.classList.contains('active')) renderCampanhas();
+  } catch(e) {
+    console.warn('Falha ao carregar comissões:', e.message);
+  } finally {
+    _comissaoCarregando = false;
+  }
+}
+
+// Monta o conteúdo da célula "💰 Comissão" pra uma campanha (sub_id)
+function _campCelulaComissao(sid) {
+  const comm = COMISSAO_MAP[sid];
+  if (!comm) return `<span style="font-size:10px;color:var(--muted)" title="Ainda não verificado">—</span>`;
+  if (comm.indisponivel)
+    return `<span style="font-size:10px;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;" title="Produto indisponível/removido na Shopee">🚫 indisponível</span>`;
+
+  const pct = Number(comm.comissao_atual || 0).toFixed(1).replace('.', ',') + '%';
+  const mostrarAlerta = comm.alerta_ativo && !comm.confirmado;
+  const pctAnterior = comm.comissao_anterior != null ? Number(comm.comissao_anterior).toFixed(1).replace('.', ',') + '%' : '—';
+
+  return `<div style="display:flex;align-items:center;justify-content:center;gap:4px">
+    <span style="font-size:11px;font-weight:600;${mostrarAlerta?'color:#dc2626':''}">${pct}</span>
+    ${mostrarAlerta ? `
+      <span style="font-size:10px" title="Caiu de ${pctAnterior} para ${pct}">📉</span>
+      <button onclick="event.stopPropagation();confirmarQuedaComissao('${esc(comm.shop_id)}','${esc(comm.item_id)}')"
+        title="Confirmar que já viu essa queda"
+        style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #dc2626;color:#dc2626;background:transparent;cursor:pointer;">✓ vi</button>
+    ` : ''}
+  </div>`;
+}
+
+// Marca o alerta de queda como visto (não apaga o histórico — uma queda NOVA
+// no próximo ciclo reabre o alerta de novo, mesmo já tendo sido confirmado).
+async function confirmarQuedaComissao(shopId, itemId) {
+  try {
+    const res = await fetch('/api/comissao?action=confirmar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shop_id: shopId, item_id: itemId }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const sidAlvo = Object.keys(COMISSAO_MAP).find(s => COMISSAO_MAP[s].shop_id === shopId && COMISSAO_MAP[s].item_id === itemId);
+    if (sidAlvo) COMISSAO_MAP[sidAlvo].confirmado = true;
+    renderCampanhas();
+    toast('✓ Alerta confirmado', 'ok');
+  } catch(e) {
+    toast('⚠️ Falha ao confirmar: ' + e.message, 'warn');
+  }
+}
+
 function _campToggleAlerta(sid) {
   if (!CFG_CAMPANHAS[sid]) CFG_CAMPANHAS[sid] = {};
   CFG_CAMPANHAS[sid].alerta_manual = !CFG_CAMPANHAS[sid].alerta_manual;
@@ -13231,6 +13326,7 @@ _carregarConfigServidor().then(carregouServidor => {
     _renderizarPaginaAtivaAposBoot();
   });
   setInterval(() => whatsAtualizarGrupos(true), 5 * 60 * 1000);
+  _carregarComissoes();
 });
 </script>
 </body>

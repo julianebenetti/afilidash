@@ -39,7 +39,8 @@ async function carregarConfig() {
 
 // ── Resolve shopId + itemId a partir do link do anúncio ──────────────
 // Segue redirecionamentos manualmente (shortlink s.shopee.com.br ou link já
-// resolvido) e extrai do path final: /{slug}/{shopId}/{itemId}
+// resolvido) e extrai do path final, testando os 2 formatos que a Shopee usa:
+// deep link (/{slug}/{shopId}/{itemId}) e clássico (...-i.{shopId}.{itemId})
 async function resolverShopItem(link) {
   let url = link;
   for (let hop = 0; hop < 5; hop++) {
@@ -58,8 +59,13 @@ async function resolverShopItem(link) {
   }
   try {
     const path = new URL(url).pathname;
-    const m = path.match(/^\/[^/]+\/(\d+)\/(\d+)/);
-    return m ? { shopId: m[1], itemId: m[2] } : null;
+    // Formato novo (deep link): /{slug}/{shopId}/{itemId}
+    const m1 = path.match(/^\/[^/]+\/(\d+)\/(\d+)/);
+    if (m1) return { shopId: m1[1], itemId: m1[2] };
+    // Formato clássico: .../algo-i.{shopId}.{itemId}
+    const m2 = path.match(/-i\.(\d+)\.(\d+)/);
+    if (m2) return { shopId: m2[1], itemId: m2[2] };
+    return null;
   } catch (e) {
     return null;
   }
@@ -153,20 +159,24 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, verificados: 0, mensagem: 'Nenhuma campanha ativa com link salvo' }) };
 
     // Agrupa por produto (shopId+itemId) — evita consultar o mesmo produto 2x
-    // quando 2+ campanhas apontam pro mesmo link. Guarda o sub_id da campanha
-    // mais recente processada (é só informativo, não afeta o valor da comissão).
+    // quando 2+ campanhas apontam pro mesmo link. Junta TODOS os sub_ids que
+    // compartilham o produto (senão só a última campanha processada ficaria
+    // com a comissão exibida, e as outras mostrariam "—" mesmo verificadas).
     const porProduto = new Map();
     const semLink = [];
     for (const [sid, c] of alvos) {
       const par = await resolverShopItem(c.link);
       if (!par) { semLink.push(sid); continue; }
-      porProduto.set(`${par.shopId}|${par.itemId}`, { ...par, sid });
+      const chave = `${par.shopId}|${par.itemId}`;
+      const existente = porProduto.get(chave);
+      if (existente) existente.sids.push(sid);
+      else porProduto.set(chave, { ...par, sids: [sid] });
     }
 
     let verificados = 0, alertasNovos = 0, indisponiveis = 0;
     const erros = [];
 
-    for (const { shopId, itemId, sid } of porProduto.values()) {
+    for (const { shopId, itemId, sids } of porProduto.values()) {
       try {
         const { indisponivel, comissao } = await buscarComissaoProduto(contaApi.appId, contaApi.secret, shopId, itemId);
         const comissaoFinal = indisponivel ? 0 : comissao;
@@ -191,7 +201,7 @@ exports.handler = async (event) => {
         const row = {
           shop_id:           shopId,
           item_id:           itemId,
-          sub_id:            sid,
+          sub_ids:           sids, // todos os sub_ids de campanhas ativas que promovem esse produto
           comissao_atual:    comissaoFinal,
           comissao_anterior: anterior ? Number(anterior.comissao_atual || 0) : null,
           indisponivel,

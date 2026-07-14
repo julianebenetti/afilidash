@@ -103,6 +103,37 @@ exports.handler = async (event) => {
   if (!SUPA_URL() || !SUPA_KEY())
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Supabase não configurado' }) };
 
+  const acao = (event.queryStringParameters || {}).action;
+
+  // ── Confirma que já viu o alerta de queda de um produto específico ──
+  // Não apaga o histórico (comissao_anterior) nem o alerta_ativo — só marca
+  // como visto. Uma queda NOVA num ciclo futuro reabre (confirmado=false de novo).
+  if (acao === 'confirmar') {
+    try {
+      const body = JSON.parse(event.body || '{}');
+      const { shop_id, item_id } = body;
+      if (!shop_id || !item_id)
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'shop_id e item_id obrigatórios' }) };
+
+      const res = await fetch(
+        `${base()}/shopee_comissao_cache?shop_id=eq.${encodeURIComponent(shop_id)}&item_id=eq.${encodeURIComponent(item_id)}`,
+        {
+          method:  'PATCH',
+          headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
+          body:    JSON.stringify({ confirmado: true }),
+        }
+      );
+      if (!res.ok) {
+        const txt = await res.text().catch(() => String(res.status));
+        return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: txt }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: err.message }) };
+    }
+  }
+
+  // ── Comportamento padrão: roda a verificação completa de comissões ──
   try {
     const cfg          = await carregarConfig();
     const cfgCampanhas = cfg.cfg_campanhas || {};

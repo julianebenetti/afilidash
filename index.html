@@ -9987,9 +9987,14 @@ async function _carregarComissoes() {
   if (_comissaoCarregando) return;
   _comissaoCarregando = true;
   try {
-    const rows = await sbGet('/shopee_comissao_cache?select=shop_id,item_id,sub_id,comissao_atual,comissao_anterior,indisponivel,alerta_ativo,confirmado');
+    const rows = await sbGet('/shopee_comissao_cache?select=shop_id,item_id,sub_ids,comissao_atual,comissao_anterior,indisponivel,alerta_ativo,confirmado');
     COMISSAO_MAP = {};
-    (rows || []).forEach(r => { if (r.sub_id) COMISSAO_MAP[r.sub_id] = r; });
+    // Cada linha pode ter vários sub_ids (campanhas diferentes promovendo o mesmo
+    // produto) — todos apontam pro MESMO objeto, então confirmar o alerta numa
+    // campanha já reflete automaticamente nas outras que compartilham o produto.
+    (rows || []).forEach(r => {
+      (r.sub_ids || []).forEach(sid => { if (sid) COMISSAO_MAP[sid] = r; });
+    });
     _comissaoCarregada = true;
     if (document.getElementById('page-campanhas')?.classList.contains('active')) renderCampanhas();
   } catch(e) {
@@ -10374,6 +10379,10 @@ function _whatsSalvarEstado() {
 let WHATS_LIVE_SINCRONIZANDO = false;
 async function whatsAtualizarGrupos(silencioso = false) {
   if (WHATS_LIVE_SINCRONIZANDO) return;
+  // Sem nenhum grupo cadastrado ainda, não tem porquê tentar sincronizar
+  // eventos "ao vivo" — evita bater numa tabela que só faz sentido existir
+  // quando houver uma automação externa alimentando ela de verdade.
+  if (!WHATS_GRUPOS.length) return;
   WHATS_LIVE_SINCRONIZANDO = true;
   const btn = document.getElementById('whats-btn-atualizar');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }

@@ -10061,13 +10061,13 @@ function _campRenderCampanhasTabela() {
     ${thS('Status','Status','border-left:2px solid var(--border);min-width:55px')}
     <th></th>
     ${thS('Conta','Conta de<br>Anúncio','min-width:55px;white-space:normal')}
-    ${thS('plataforma','Plataforma','min-width:65px')}
     ${thS('orcamento','Orçamento','text-align:right;min-width:75px')}
-    ${thS('tipo','Tipo','text-align:center')}
-    ${thS('mes','Mês','text-align:center;min-width:65px')}
     ${thS('totalDias','Dias')}
     <th style="min-width:70px;text-align:left">Link</th>
     <th style="min-width:140px;text-align:center">💰 Comissão</th>
+    ${thS('plataforma','Plataforma','min-width:65px')}
+    ${thS('tipo','Tipo','text-align:center')}
+    ${thS('mes','Mês','text-align:center;min-width:65px')}
     <th style="min-width:140px;text-align:left">Obs</th>
     <th style="text-align:left">Motivo Pausa</th>
     <th style="text-align:center;min-width:36px"></th>
@@ -10192,17 +10192,7 @@ function _campRenderCampanhasTabela() {
         }
       </td>
       <td style="font-size:10px;color:var(--muted);text-align:left;">${esc(c.Conta || (cfg.meta_account_id ? (CFG_META.find(m => 'act_' + m.id === cfg.meta_account_id)?.nome || '') : ''))}</td>
-      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:75px;"
-          onchange="event.stopPropagation();_campSetPlat('${sid}',this.value)">${selPlat}</select>
-        <button onclick="event.stopPropagation();abrirHistPlat('${sid}')"
-          title="Histórico de plataforma"
-          style="font-size:10px;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--muted);cursor:pointer;margin-left:2px;">📋</button>
-      </td>
       <td style="font-size:11px;text-align:right;white-space:nowrap">${orcFmt}</td>
-      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);"
-          onchange="event.stopPropagation();_campSet('${sid}','tipo',this.value)">${selTipo}</select></td>
-      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:80px;"
-          onchange="event.stopPropagation();_campSet('${sid}','mes',this.value)">${selMes}</select></td>
       <td style="font-size:11px">${c.totalDias}</td>
 
       <td style="white-space:nowrap">
@@ -10217,6 +10207,16 @@ function _campRenderCampanhasTabela() {
         </div>
       </td>
       <td style="text-align:center;white-space:nowrap">${_campCelulaComissao(sid)}</td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:75px;"
+          onchange="event.stopPropagation();_campSetPlat('${sid}',this.value)">${selPlat}</select>
+        <button onclick="event.stopPropagation();abrirHistPlat('${sid}')"
+          title="Histórico de plataforma"
+          style="font-size:10px;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--muted);cursor:pointer;margin-left:2px;">📋</button>
+      </td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);"
+          onchange="event.stopPropagation();_campSet('${sid}','tipo',this.value)">${selTipo}</select></td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:80px;"
+          onchange="event.stopPropagation();_campSet('${sid}','mes',this.value)">${selMes}</select></td>
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:3px">
           <span style="font-size:11px;color:var(--muted);flex-shrink:0;">${(()=>{const _h=new Date();return (_h.getDate()+'').padStart(2,'0')+'/'+((_h.getMonth()+1)+'').padStart(2,'0');})()}</span>

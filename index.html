@@ -510,6 +510,18 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
     </div>
   </div>
   <div class="kpi-grid" id="mgv-kpis" style="margin-bottom:16px;"></div>
+
+  <div class="section" id="mgv-trajetoria-section" style="margin-bottom:16px;">
+    <div class="section-head" style="cursor:pointer" onclick="toggleTrajetoriaGMV()">
+      <div>
+        <div class="section-title">📈 Histórico Mensal — Trajetória Completa</div>
+        <div class="section-sub">Rótulo e anotação de cada mês são preenchidos por você</div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);margin-left:auto" id="mgv-trajetoria-toggle-txt">▲ esconder</span>
+    </div>
+    <div id="mgv-trajetoria-corpo" style="display:block;padding:16px 20px;"></div>
+  </div>
+
   <div class="section">
     <div class="section-head">
       <div class="section-title" id="mgv-titulo">Meta GMV</div>
@@ -1208,7 +1220,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
           </div>
           <div class="cfg-field">
             <label>CPC máximo D0 (R$)</label>
-            <input type="number" id="mgd-cpc" oninput="autoSalvarConfig()" step="0.01" value="0.30">
+            <input type="number" id="mgd-cpc" oninput="autoSalvarConfig()" step="0.01" value="0.15">
           </div>
         </div>
       </div>
@@ -6581,6 +6593,10 @@ let CFG_CAMPANHAS = carregar('cfg_campanhas', {}); // { sub_id: { plataforma, or
 // META GMV — estado global
 let MGV_CONFIG    = carregar('mgv_config', {});    // { 'ACCENDA|2026-06': {meta1,pct1,...} }
 let MGV_PLAN      = carregar('mgv_plan', {});       // { 'ACCENDA|2026-06-15': {gasto,pct,flag} }
+// Trajetória mensal (gráfico "Piso/Transição/Campeão") — rótulo e anotação são
+// sempre manuais (é análise da Benetti, não dá pra descobrir isso automático).
+// { 'ACCENDA|2026-06': {rotulo:'piso'|'transicao'|'campeao', nota:'...'} }
+let CFG_MGV_TIMELINE = carregar('cfg_mgv_timeline', {});
 let MGV_HIST_PLAT = carregar('mgv_hist_plat', {});  // { sub_id: [{plataforma,de,ate}] }
 let mgvContaAtiva = '';
 let mgvMesOffset  = 0;
@@ -7018,6 +7034,8 @@ function renderContasShopee() {
           <input type="checkbox" ${ct.mgvAtivo?'checked':''} onchange="updateContaShopee('${ct.id}','mgvAtivo',this.checked)" style="accent-color:#2563eb;">
           🎯 Meta de GMV
         </label>
+        <button onclick="event.stopPropagation();removerContaShopee('${ct.id}')" title="Remover esta plataforma"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--red-bdr);border-radius:var(--r);background:transparent;color:var(--red);cursor:pointer;">🗑️</button>
 
       </div>
       <div class="cfg-row2" style="margin-top:12px;">
@@ -7098,6 +7116,7 @@ function toggleContaShopee(id, val) {
 function removerContaShopee(id) {
   if (!confirm('Remover esta conta Shopee?')) return;
   CFG_SHOPEE = CFG_SHOPEE.filter(x => x.id !== id);
+  salvar('cfg_shopee', CFG_SHOPEE);
   renderContasShopee();
   renderMetasMensais();
   atualizarFiltrosContas();
@@ -7125,6 +7144,8 @@ function renderContasMeta() {
         </label>
         <input class="cfg-account-name" style="border:1px solid var(--border);border-radius:var(--r);padding:5px 10px;outline:none;background:var(--bg);font-size:13px;font-weight:500;flex:1;font-family:var(--font);"
           value="${esc(c.nome)}" oninput="updateContaMeta('${c.id}','nome',this.value)" placeholder="Conta de anúncio 1">
+        <button onclick="removerContaMeta('${c.id}')" title="Remover esta conta"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--red-bdr);border-radius:var(--r);background:transparent;color:var(--red);cursor:pointer;">🗑️</button>
 
       </div>
       <div class="cfg-row2">
@@ -7171,6 +7192,7 @@ function toggleContaMeta(id, val) {
 function removerContaMeta(id) {
   if (!confirm('Remover esta conta Meta?')) return;
   CFG_META = CFG_META.filter(x => x.id !== id);
+  salvar('cfg_meta', CFG_META);
   renderContasMeta();
 }
 function adicionarContaMeta() {
@@ -7271,12 +7293,14 @@ function autoSalvarConfig() {
     const mgdFraco = parseFloat(document.getElementById('mgd-fraco')?.value);
     const mgdMed   = parseFloat(document.getElementById('mgd-med')?.value);
     const mgdBom   = parseFloat(document.getElementById('mgd-bom')?.value);
-    if (!isNaN(mgdPess) || !isNaN(mgdFraco) || !isNaN(mgdMed) || !isNaN(mgdBom)) {
+    const mgdCpc   = parseFloat(document.getElementById('mgd-cpc')?.value);
+    if (!isNaN(mgdPess) || !isNaN(mgdFraco) || !isNaN(mgdMed) || !isNaN(mgdBom) || !isNaN(mgdCpc)) {
       CFG.mgd = {
         pess:  !isNaN(mgdPess)  ? mgdPess  : (CFG.mgd?.pess  ?? 0.83),
         fraco: !isNaN(mgdFraco) ? mgdFraco : (CFG.mgd?.fraco ?? 1.07),
         med:   !isNaN(mgdMed)   ? mgdMed   : (CFG.mgd?.med   ?? 1.24),
         bom:   !isNaN(mgdBom)   ? mgdBom   : (CFG.mgd?.bom   ?? 1.65),
+        cpc:   !isNaN(mgdCpc)   ? mgdCpc   : (CFG.mgd?.cpc   ?? 0.15),
       };
       const campEl = document.getElementById('mgd-camp');
       if (campEl) campEl.value = CFG.mgd.bom; // espelha Bom, é só exibição
@@ -7922,7 +7946,101 @@ function mgvBarra(pct) {
 
 function mgvNavMes(delta) { mgvMesOffset += delta; renderMetaGMV(); }
 function mgvIrHoje()      { mgvMesOffset = 0;      renderMetaGMV(); }
-function mgvSetConta(c)   { mgvContaAtiva = c; contaAtiva = c; _invalidarEscopo(); mgvExpanded = {}; renderMetaGMV(); }
+function mgvSetConta(c)   { mgvContaAtiva = c; contaAtiva = c; _invalidarEscopo(); mgvExpanded = {}; renderMetaGMV(); renderTrajetoriaGMV(); }
+
+// ═══════════════════════════════════════════
+// TRAJETÓRIA MENSAL (gráfico Piso/Transição/Campeão) — aba Meta GMV
+// Barra e valor são automáticos (GMV Shopee do mês, pra conta ativa). Rótulo
+// e anotação são sempre manuais — é leitura/análise da Benetti sobre o mês.
+// ═══════════════════════════════════════════
+const MGV_ROTULOS = {
+  piso:      { label: 'Piso',      cor: '#ef4444', bg: 'var(--red-bg)',    txt: 'var(--red)' },
+  transicao: { label: 'Transição', cor: '#f5b942', bg: 'var(--yellow-bg)', txt: 'var(--yellow)' },
+  campeao:   { label: 'Campeão',   cor: '#3b82f6', bg: 'var(--blue-bg)',   txt: '#1d4ed8' },
+};
+const MGV_MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// GMV Shopee (venda total, pedidos pendentes+concluídos) por mês, pra uma conta
+function _gmvMensalPorConta(conta) {
+  const porMes = {};
+  const contaUp = (conta||'').toUpperCase();
+  if (!contaUp) return porMes;
+  DADOS.forEach(r => {
+    if (r.Plataforma === 'meta') return;
+    if ((r.Conta||'').toUpperCase() !== contaUp) return;
+    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') return;
+    const dt = normData(r.Data); if (!dt) return;
+    const mesKey = dt.slice(0, 7);
+    porMes[mesKey] = (porMes[mesKey] || 0) + (Number(r.Venda_Total) || 0);
+  });
+  return porMes;
+}
+
+function toggleTrajetoriaGMV() {
+  const el  = document.getElementById('mgv-trajetoria-corpo');
+  const txt = document.getElementById('mgv-trajetoria-toggle-txt');
+  if (!el) return;
+  const abrir = el.style.display === 'none';
+  el.style.display = abrir ? 'block' : 'none';
+  if (txt) txt.textContent = abrir ? '▲ esconder' : '▼ mostrar';
+  if (abrir) renderTrajetoriaGMV();
+}
+
+function renderTrajetoriaGMV() {
+  const el = document.getElementById('mgv-trajetoria-corpo');
+  if (!el || el.style.display === 'none') return;
+  const conta = mgvContaAtiva;
+  if (!conta) {
+    el.innerHTML = '<div class="cfg-hint">Selecione uma conta específica (não "Todas") pra ver a trajetória mensal.</div>';
+    return;
+  }
+  const porMes = _gmvMensalPorConta(conta);
+  const meses  = Object.keys(porMes).sort();
+  if (!meses.length) {
+    el.innerHTML = '<div class="cfg-hint">Sem dados de GMV pra essa conta ainda.</div>';
+    return;
+  }
+  const maxGmv = Math.max(...meses.map(m => porMes[m]), 1);
+  const fmtGmv = v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v.toFixed(0));
+
+  el.innerHTML = meses.map(mesKey => {
+    const gmv    = porMes[mesKey];
+    const chave  = conta + '|' + mesKey;
+    const cfg    = CFG_MGV_TIMELINE[chave] || {};
+    const rotulo = cfg.rotulo || 'piso';
+    const info   = MGV_ROTULOS[rotulo] || MGV_ROTULOS.piso;
+    const pctBar = Math.max(4, Math.round(gmv / maxGmv * 100));
+    const [ano, mesNum] = mesKey.split('-');
+    const mesLbl = MGV_MESES_ABREV[parseInt(mesNum, 10) - 1] + '/' + ano.slice(2);
+
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 2px;">
+      <div style="width:50px;font-size:12px;font-weight:700;color:var(--text);flex-shrink:0;">${mesLbl}</div>
+      <div style="flex:1;background:var(--bg3);border-radius:4px;overflow:hidden;height:22px;">
+        <div style="width:${pctBar}%;height:100%;background:${info.cor};border-radius:4px;transition:width .3s;"></div>
+      </div>
+      <div style="width:75px;text-align:right;font-size:12px;font-weight:700;color:${info.cor};flex-shrink:0;">${fmtGmv(gmv)}</div>
+      <select onchange="_mgvSetTimeline('${chave}','rotulo',this.value)"
+        style="font-size:10px;padding:3px 6px;border-radius:4px;border:none;background:${info.bg};color:${info.txt};font-weight:700;cursor:pointer;flex-shrink:0;">
+        <option value="piso" ${rotulo==='piso'?'selected':''}>Piso</option>
+        <option value="transicao" ${rotulo==='transicao'?'selected':''}>Transição</option>
+        <option value="campeao" ${rotulo==='campeao'?'selected':''}>Campeão</option>
+      </select>
+    </div>
+    <div style="padding:0 0 10px 60px;">
+      <input type="text" value="${esc(cfg.nota||'')}" placeholder="Anotação desse mês (opcional)..."
+        oninput="_mgvSetTimeline('${chave}','nota',this.value)"
+        style="width:100%;max-width:520px;font-size:11px;border:none;border-bottom:1px dashed var(--border);padding:3px 2px;font-family:var(--font);background:transparent;color:var(--muted);outline:none;">
+    </div>`;
+  }).join('');
+}
+
+function _mgvSetTimeline(chave, campo, valor) {
+  if (!CFG_MGV_TIMELINE[chave]) CFG_MGV_TIMELINE[chave] = {};
+  CFG_MGV_TIMELINE[chave][campo] = valor;
+  salvar('cfg_mgv_timeline', CFG_MGV_TIMELINE);
+  if (campo === 'rotulo') renderTrajetoriaGMV(); // recolore a barra/badge/valor
+}
 function mgvToggle(key)   { mgvExpanded[key] = !mgvExpanded[key]; renderMetaGMV(); }
 function mgvExpandirTudo()  { document.querySelectorAll('[data-mgv-key]').forEach(tr=>{ mgvExpanded[tr.dataset.mgvKey]=true; }); renderMetaGMV(); }
 function mgvRecolherTudo()  { mgvExpanded={}; renderMetaGMV(); }
@@ -8720,6 +8838,7 @@ function renderMetaGMV() {
   }
   document.getElementById('mgv-body').innerHTML = html;
   _mgvPainelPreparadoAssinatura = _mgvBaseAssinatura();
+  renderTrajetoriaGMV();
 }
 
 // ═══════════════════════════════════════════
@@ -8781,6 +8900,24 @@ function _rotuloDiaCampanha(sid, dataStr) {
   if (!d0 || !dataStr) return null;
   const diff = Math.round((new Date(dataStr + 'T00:00:00') - new Date(d0 + 'T00:00:00')) / 86400000);
   return diff < 0 ? null : 'D' + diff;
+}
+
+// CPC do dia D0 (primeiro dia com gasto) de uma campanha — soma gasto e cliques
+// Meta daquele dia específico. null se não tiver cliques registrados (evita
+// divisão por zero) ou se ainda não tiver D0 identificado.
+function _cpcD0Campanha(sid) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return null;
+  const key = (sid || '').toLowerCase();
+  let gasto = 0, cliques = 0;
+  for (const r of DADOS) {
+    if (r.Plataforma !== 'meta') continue;
+    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
+    if (normData(r.Data) !== d0) continue;
+    gasto   += Number(r.Gasto_Meta)    || 0;
+    cliques += Number(r.Cliques_Meta)  || 0;
+  }
+  return cliques > 0 ? gasto / cliques : null;
 }
 
 // Selo "D12" pra usar perto do nome da campanha (fase atual, baseada em hoje)
@@ -9930,7 +10067,7 @@ function _campRenderCampanhasTabela() {
     ${thS('mes','Mês','text-align:center;min-width:65px')}
     ${thS('totalDias','Dias')}
     <th style="min-width:70px;text-align:left">Link</th>
-    <th style="min-width:80px;text-align:center">💰 Comissão</th>
+    <th style="min-width:140px;text-align:center">💰 Comissão</th>
     <th style="min-width:140px;text-align:left">Obs</th>
     <th style="text-align:left">Motivo Pausa</th>
     <th style="text-align:center;min-width:36px"></th>
@@ -9993,6 +10130,13 @@ function _campRenderCampanhasTabela() {
     const isAtivo = _statusInfo.isAtivo;
     const rdMedia=c._rdMedia, rdLbl=c._rdLbl, rdCls=c._rdCls;
     const alertaAuto=c.alerta, alertaManual=!!cfg.alerta_manual;
+    const cpcD0 = _cpcD0Campanha(sid);
+    const limiteCpcD0 = CFG.mgd?.cpc ?? 0.15;
+    const alertaCpcD0 = cpcD0 != null && cpcD0 > limiteCpcD0;
+    const motivosAlertaAuto = [];
+    if (alertaAuto) motivosAlertaAuto.push('3 dias seguidos com ROAS < 1,0x');
+    if (alertaCpcD0) motivosAlertaAuto.push(`CPC do D0 acima de R$ ${limiteCpcD0.toFixed(2).replace('.',',')} (ficou R$ ${cpcD0.toFixed(2).replace('.',',')})`);
+    const temAlertaAuto = motivosAlertaAuto.length > 0;
 
     // Mostra só a plataforma VIGENTE hoje (via histórico de vigências).
     const platVigente = mgvPlataformaNaData(sid, fmt(hoje)) || '';
@@ -10032,7 +10176,7 @@ function _campRenderCampanhasTabela() {
       <td style="text-align:center;border-left:2px solid var(--border)"><div style="${mediaSty}">${rdMedia>0?rdMedia.toFixed(2).replace('.',',')+'x':'—'}</div></td>
       <td style="text-align:center"><span class="badge ${rdCls}">${rdLbl}</span></td>
       <td style="text-align:center">
-        <span style="color:var(--red);font-size:11px;margin-right:3px" title="Alerta automático (3d < 1.0x)">⚠️</span>
+        ${temAlertaAuto ? `<span style="color:var(--red);font-size:11px;margin-right:3px" title="${esc(motivosAlertaAuto.join(' | '))}">⚠️</span>` : ''}
         <input type="checkbox" ${alertaManual?'checked':''}
           style="width:14px;height:14px;cursor:pointer;accent-color:#dc2626;vertical-align:middle;"
           onclick="event.stopPropagation();_campToggleAlerta('${sid}')"
@@ -10245,7 +10389,7 @@ async function _carregarComissoes() {
   if (_comissaoCarregando) return;
   _comissaoCarregando = true;
   try {
-    const rows = await sbGet('/shopee_comissao_cache?select=shop_id,item_id,sub_ids,comissao_atual,comissao_anterior,indisponivel,alerta_ativo,confirmado');
+    const rows = await sbGet('/shopee_comissao_cache?select=shop_id,item_id,sub_ids,comissao_atual,comissao_anterior,indisponivel,alerta_ativo,confirmado,preco,comissao_valor');
     COMISSAO_MAP = {};
     // Cada linha pode ter vários sub_ids (campanhas diferentes promovendo o mesmo
     // produto) — todos apontam pro MESMO objeto, então confirmar o alerta numa
@@ -10272,15 +10416,22 @@ function _campCelulaComissao(sid) {
   const pct = Number(comm.comissao_atual || 0).toFixed(1).replace('.', ',') + '%';
   const mostrarAlerta = comm.alerta_ativo && !comm.confirmado;
   const pctAnterior = comm.comissao_anterior != null ? Number(comm.comissao_anterior).toFixed(1).replace('.', ',') + '%' : '—';
+  const precoTxt = comm.preco != null ? 'R$ ' + Number(comm.preco).toFixed(2).replace('.', ',') : null;
+  const valorTxt = comm.comissao_valor != null ? 'R$ ' + Number(comm.comissao_valor).toFixed(2).replace('.', ',') : null;
 
-  return `<div style="display:flex;align-items:center;justify-content:center;gap:4px">
-    <span style="font-size:11px;font-weight:600;${mostrarAlerta?'color:#dc2626':''}">${pct}</span>
-    ${mostrarAlerta ? `
-      <span style="font-size:10px" title="Caiu de ${pctAnterior} para ${pct}">📉</span>
-      <button onclick="event.stopPropagation();confirmarQuedaComissao('${esc(comm.shop_id)}','${esc(comm.item_id)}')"
-        title="Confirmar que já viu essa queda"
-        style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #dc2626;color:#dc2626;background:transparent;cursor:pointer;">✓ vi</button>
-    ` : ''}
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+    <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+      <span style="font-size:11px;font-weight:600;${mostrarAlerta?'color:#dc2626':''}">${pct}</span>
+      ${mostrarAlerta ? `
+        <span style="font-size:10px" title="Caiu de ${pctAnterior} para ${pct}">📉</span>
+        <button onclick="event.stopPropagation();confirmarQuedaComissao('${esc(comm.shop_id)}','${esc(comm.item_id)}')"
+          title="Confirmar que já viu essa queda"
+          style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid #dc2626;color:#dc2626;background:transparent;cursor:pointer;">✓ vi</button>
+      ` : ''}
+    </div>
+    ${(precoTxt || valorTxt) ? `<div style="font-size:9px;color:var(--muted);white-space:nowrap;" title="Preço do produto e valor da comissão no momento da última verificação">
+      ${precoTxt ? 'Produto ' + precoTxt : ''}${precoTxt && valorTxt ? ' · ' : ''}${valorTxt ? 'Comissão ' + valorTxt : ''}
+    </div>` : ''}
   </div>`;
 }
 
@@ -13218,6 +13369,7 @@ function initConfig() {
     const mm = document.getElementById('mgd-med');   if (mm) mm.value = CFG.mgd.med   ?? 1.24;
     const mb = document.getElementById('mgd-bom');   if (mb) mb.value = CFG.mgd.bom   ?? 1.65;
     const mc = document.getElementById('mgd-camp');  if (mc) mc.value = CFG.mgd.bom   ?? 1.65;
+    const mcp = document.getElementById('mgd-cpc');  if (mcp) mcp.value = CFG.mgd.cpc ?? 0.15;
   }
   // Restaura classificação de evasão de grupo e custo por lead (se já tiver sido salva antes)
   if (CFG.evasao_grupo) {

@@ -128,6 +128,9 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
 #page-dashboard .tbl-wrap tr.data-row:hover td:first-child { background:#f8f7f4; }
 #page-dashboard .tbl-wrap tr.data-row.selected td:first-child { background:var(--blue-bg); }
 
+/* ── Ocultar nome das campanhas (privacidade pra print/compartilhar tela) ── */
+body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
+
 /* ── BADGES ── */
 .badge { display:inline-block; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; white-space:nowrap; }
 .b-camp  { background:#166534; color:#fff; }
@@ -331,6 +334,8 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
     <button class="nav-conta active" id="nav-conta-todas" onclick="setConta('todas',this)">Todas</button>
     <div id="nav-contas-dinamicas" style="display:contents"></div>
   </div>
+  <button id="btn-blur-nomes" onclick="toggleBlurNomes()" title="Borrar/mostrar nome das campanhas (Dashboard e Campanhas)"
+    style="margin-left:8px;font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--muted);cursor:pointer;">🙈 Ocultar nomes</button>
 </nav>
 
 <!-- ══════════════════════════════════════════
@@ -3672,7 +3677,7 @@ function renderTable(rowsBase = null) {
     const _alertaIcon = _alertaManualDash ? '<span style="color:#dc2626;font-size:10px;margin-left:3px">⚠️</span>' : '';
     const mainRow = `<tr class="data-row" data-sid="${safeId}" onclick="_dashToggleSelecionada(this)" style="${_alertaBg}">${
       COLS.map(col => {
-        if (col.key === 'Sub_ID') return `<td style="text-align:left;${_alertaBg}"><span class="sub-id-link" onclick="event.stopPropagation();toggleDrill('${sid}',this.closest('tr'))" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><span class="drill-arrow" id="arr-${safeId}">▶</span>${r.Sub_ID||'—'}${_badgeDiaCampanha(r.Sub_ID)}<button onclick="event.stopPropagation();navigator.clipboard.writeText('${(r.Sub_ID||'').replace(/'/g,"\'")}').then(()=>toast('✓ Copiado!','ok'))" title="Copiar nome" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-size:10px;flex-shrink:0;opacity:.7;line-height:1">📋</button>${_alertaIcon}</span></td>`;
+        if (col.key === 'Sub_ID') return `<td style="text-align:left;${_alertaBg}"><span class="sub-id-link" onclick="event.stopPropagation();toggleDrill('${sid}',this.closest('tr'))" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><span class="drill-arrow" id="arr-${safeId}">▶</span><span class="ad-nome-camp">${r.Sub_ID||'—'}</span>${_badgeDiaCampanha(r.Sub_ID)}<button onclick="event.stopPropagation();navigator.clipboard.writeText('${(r.Sub_ID||'').replace(/'/g,"\'")}').then(()=>toast('✓ Copiado!','ok'))" title="Copiar nome" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-size:10px;flex-shrink:0;opacity:.7;line-height:1">📋</button>${_alertaIcon}</span></td>`;
         return fmtCell(r[col.key], col.fmt, r);
       }).join('')
     }</tr>`;
@@ -4448,6 +4453,19 @@ function toggleKpiGrid(forcarEstado) {
 }
 function _restaurarEstadoKpiGrid() {
   if (localStorage.getItem('ad_kpi_recolhido') === '1') toggleKpiGrid(true);
+}
+// Borra/mostra o nome das campanhas (Dashboard e Campanhas) — pra printar ou
+// compartilhar tela sem expor nomes de produto/estratégia. Preferência salva.
+function toggleBlurNomes(forcarEstado) {
+  const btn = document.getElementById('btn-blur-nomes');
+  if (!btn) return;
+  const ativo = forcarEstado !== undefined ? forcarEstado : !document.body.classList.contains('ad-blur-nomes');
+  document.body.classList.toggle('ad-blur-nomes', ativo);
+  btn.textContent = ativo ? '🐵 Mostrar nomes' : '🙈 Ocultar nomes';
+  localStorage.setItem('ad_blur_nomes', ativo ? '1' : '0');
+}
+function _restaurarEstadoBlurNomes() {
+  if (localStorage.getItem('ad_blur_nomes') === '1') toggleBlurNomes(true);
 }
 // Redimensiona a tabela do Dashboard pra ocupar o espaço realmente disponível
 // na tela, em vez de uma altura fixa — assim, recolher os KPIs de fato mostra
@@ -6706,6 +6724,12 @@ function opsDragEnd(e) { e.currentTarget.style.opacity=''; e.currentTarget.style
 // Usados no modal de pausar campanha (pausarCamp) e na coluna "Motivo Pausa"
 // da aba Campanhas — antes eram 2 listas fixas no código, agora vêm daqui.
 // ═══════════════════════════════════════════
+// Usada tanto no render quanto em handlers onchange inline (que rodam fora do
+// escopo da função de render, por isso não pode ser uma variável local ali).
+function _motivoPausaTemAlerta(nome) {
+  return CFG_MOTIVOS_PAUSA.some(m => m.alerta && m.nome === nome);
+}
+
 function renderMotivosPausa() {
   const el = document.getElementById('motivos-pausa-list');
   if (!el) return;
@@ -9770,7 +9794,6 @@ function renderCampanhas() {
   const r2 = n=>'R$ '+n.toFixed(2).replace('.',',');
   const fN = n=>n.toFixed(2).replace('.',',');
   const TIPOS_CAMP = ['NOVO', 'RETESTE', 'VARIAÇÃO', 'DUP', 'OUTRO'];
-  const MOTIVOS_PAUSA_ALERTA = CFG_MOTIVOS_PAUSA.filter(m => m.alerta).map(m => m.nome);
   const MESES_CAMP = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
   // ── ROAS: datas e mapa ── construídos ANTES de filtrar/ordenar
@@ -9997,7 +10020,7 @@ function _campRenderCampanhasTabela() {
       <td style="text-align:left;min-width:200px">
         <input type="checkbox" class="camp-sel-chk" ${jaSelecionado?'checked':''} onclick="event.stopPropagation();_campToggleLinha(this.closest('tr'))"
           style="width:13px;height:13px;cursor:pointer;vertical-align:middle;margin-right:6px;accent-color:#2563eb;">
-        <span style="font-size:11px;font-weight:500">${esc(c.Sub_ID)}</span>
+        <span class="ad-nome-camp" style="font-size:11px;font-weight:500">${esc(c.Sub_ID)}</span>
         ${_badgeDiaCampanha(c.Sub_ID)}
         <button onclick="event.stopPropagation();navigator.clipboard.writeText('${esc(c.Sub_ID)}').then(()=>toast('✓ Copiado!','ok'))"
           title="Copiar nome"
@@ -10064,9 +10087,9 @@ function _campRenderCampanhasTabela() {
         </div>
       </td>
       <td>
-        <select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--bg2);color:${MOTIVOS_PAUSA_ALERTA.includes(cfg.motivo_pausa)?'#dc2626':'var(--text)'};"
+        <select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--bg2);color:${_motivoPausaTemAlerta(cfg.motivo_pausa)?'#dc2626':'var(--text)'};"
           onclick="event.stopPropagation()"
-          onchange="event.stopPropagation();_campSet('${sid}','motivo_pausa',this.value);this.style.color=MOTIVOS_PAUSA_ALERTA.includes(this.value)?'#dc2626':'var(--text)'">
+          onchange="event.stopPropagation();_campSet('${sid}','motivo_pausa',this.value);this.style.color=_motivoPausaTemAlerta(this.value)?'#dc2626':'var(--text)'">
           <option value="">—</option>
           ${CFG_MOTIVOS_PAUSA.map(m=>'<option value="'+esc(m.nome)+'" '+(cfg.motivo_pausa===m.nome?'selected':'')+'>'+esc(m.nome)+'</option>').join('')}
         </select>
@@ -13581,6 +13604,7 @@ _carregarConfigServidor().then(carregouServidor => {
   _carregarComissoes();
   _restaurarEstadoKpiGrid();
   _ajustarAlturaTabelaDash();
+  _restaurarEstadoBlurNomes();
 });
 </script>
 </body>

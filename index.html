@@ -110,6 +110,24 @@ tr.total-row td { background:var(--bg3); font-weight:700; border-top:2px solid v
 .drill-arrow { font-size:9px; color:var(--muted); transition:.15s; }
 tr.data-row:hover .drill-arrow { color:#2563eb; }
 
+/* ── Coluna Sub_ID congelada (aba Campanhas) ── */
+#page-campanhas .tbl-wrap th:first-child { left:0; z-index:11; }
+#page-campanhas .tbl-wrap td:first-child {
+  position:sticky; left:0; z-index:2; background:var(--bg2);
+  box-shadow:2px 0 4px -2px rgba(0,0,0,.15);
+}
+#page-campanhas .tbl-wrap tr.data-row:hover td:first-child { background:#f8f7f4; }
+#page-campanhas .tbl-wrap tr.camp-selected td:first-child { background:var(--blue-bg); }
+
+/* ── Coluna Sub_ID congelada (aba Dashboard) ── */
+#page-dashboard .tbl-wrap th:first-child { left:0; z-index:11; }
+#page-dashboard .tbl-wrap td:first-child {
+  position:sticky; left:0; z-index:2; background:var(--bg2);
+  box-shadow:2px 0 4px -2px rgba(0,0,0,.15);
+}
+#page-dashboard .tbl-wrap tr.data-row:hover td:first-child { background:#f8f7f4; }
+#page-dashboard .tbl-wrap tr.data-row.selected td:first-child { background:var(--blue-bg); }
+
 /* ── BADGES ── */
 .badge { display:inline-block; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; white-space:nowrap; }
 .b-camp  { background:#166534; color:#fff; }
@@ -344,6 +362,10 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
   </div>
 
   <!-- KPIs -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:2px;">
+    <button id="btn-toggle-kpi" onclick="toggleKpiGrid()" title="Recolher/mostrar os cards de KPI"
+      style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--muted);cursor:pointer;">▲ Recolher KPIs</button>
+  </div>
   <div class="kpi-grid" id="kpi-grid">
     <div class="kpi empty" id="kpi-loading" style="grid-column:1/-1;padding:30px;">⏳ Carregando...</div>
   </div>
@@ -545,7 +567,8 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
         <tbody id="mensal-body"><tr><td colspan="12" class="empty">⏳ Carregando...</td></tr></tbody>
       </table>
     </div>
-renderPedidos();">📅 Ontem</button></div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════
      PÁGINA: PEDIDOS
@@ -1106,6 +1129,7 @@ renderPedidos();">📅 Ontem</button></div>
         <button class="cfg-tab" onclick="setCfgTab('meta',this)">Conta Meta Ads</button>
         <button class="cfg-tab" onclick="setCfgTab('abas',this);renderCfgAbas()">Abas</button>
         <button class="cfg-tab" onclick="setCfgTab('mgd',this)">Classificação</button>
+        <button class="cfg-tab" onclick="setCfgTab('motivospausa',this);renderMotivosPausa();">Motivos de Pausa</button>
         <button class="cfg-tab" onclick="setCfgTab('datas',this);renderDatas();">Datas Especiais</button>
         <button class="cfg-tab" onclick="setCfgTab('operacoes',this);renderOperacoes();">Operações</button>
         <button class="cfg-tab" onclick="setCfgTab('atualizacao',this);renderBackupExclusao();">Backup/Exclusão</button>
@@ -1174,7 +1198,7 @@ renderPedidos();">📅 Ontem</button></div>
           </div>
           <div class="cfg-field">
             <label><span class="badge b-camp">Campeão</span> — acima de</label>
-            <input type="number" id="mgd-camp" oninput="autoSalvarConfig()" step="0.01" value="1.65">
+            <input type="number" id="mgd-camp" step="0.01" value="1.65" disabled style="opacity:.6">
           </div>
           <div class="cfg-field">
             <label>CPC máximo D0 (R$)</label>
@@ -1223,6 +1247,16 @@ renderPedidos();">📅 Ontem</button></div>
         </div>
       </div>
 
+    </div>
+
+    <!-- ── MOTIVOS DE PAUSA ── -->
+    <div class="cfg-panel" id="cfgpanel-motivospausa">
+      <div class="cfg-card">
+        <div class="cfg-card-title">Motivos de pausa <span style="font-size:11px;font-weight:400;color:var(--muted);">— usados no modal de pausar campanha e na coluna "Motivo Pausa" da aba Campanhas</span></div>
+        <div class="cfg-hint" style="margin-top:4px;">"Destacar em vermelho" controla se esse motivo aparece com destaque na coluna da tabela. Arraste pelo ⠿ pra reordenar (é a ordem que aparece nos botões do modal de pausar).</div>
+        <div id="motivos-pausa-list" style="margin-top:10px;"></div>
+        <button class="add-btn" onclick="adicionarMotivoPausa()" style="margin-top:8px;">+ Adicionar motivo</button>
+      </div>
     </div>
 
     <!-- ── ATUALIZAÇÃO ── -->
@@ -2716,10 +2750,14 @@ function derivar(r) {
 }
 
 function classifROAS(v) {
-  if (v > 1.65) return ['Campeão', 'b-camp'];
-  if (v > 1.24) return ['Bom',     'b-bom'];
-  if (v > 1.07) return ['Mediano', 'b-med'];
-  if (v > 0.83) return ['Fraco',   'b-fraco'];
+  // Lê as faixas configuradas em Configuração → Classificação (CFG.mgd); se ainda
+  // não foi configurado nada, cai nos mesmos valores padrão de sempre.
+  const m = CFG.mgd || {};
+  const fraco = m.fraco ?? 1.07, med = m.med ?? 1.24, bom = m.bom ?? 1.65, pess = m.pess ?? 0.83;
+  if (v > bom)   return ['Campeão', 'b-camp'];
+  if (v > med)   return ['Bom',     'b-bom'];
+  if (v > fraco) return ['Mediano', 'b-med'];
+  if (v > pess)  return ['Fraco',   'b-fraco'];
   return ['Péssimo', 'b-pess'];
 }
 
@@ -3029,7 +3067,7 @@ async function ativarCamp(sid) {
 }
 
 function pausarCamp(btn, sid, conta) {
-  const motivos = ['—','RETESTAR','EMPATE','CPC ALTO','DATA ESPECIAL','DIF CLIQUE'];
+  const motivos = ['—', ...CFG_MOTIVOS_PAUSA.map(m => m.nome).filter(Boolean)];
   const overlay = document.createElement('div');
   overlay.className = 'pausa-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
@@ -3634,7 +3672,7 @@ function renderTable(rowsBase = null) {
     const _alertaIcon = _alertaManualDash ? '<span style="color:#dc2626;font-size:10px;margin-left:3px">⚠️</span>' : '';
     const mainRow = `<tr class="data-row" data-sid="${safeId}" onclick="_dashToggleSelecionada(this)" style="${_alertaBg}">${
       COLS.map(col => {
-        if (col.key === 'Sub_ID') return `<td style="text-align:left;${_alertaBg}"><span class="sub-id-link" onclick="event.stopPropagation();toggleDrill('${sid}',this.closest('tr'))" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><span class="drill-arrow" id="arr-${safeId}">▶</span>${r.Sub_ID||'—'}<button onclick="event.stopPropagation();navigator.clipboard.writeText('${(r.Sub_ID||'').replace(/'/g,"\'")}').then(()=>toast('✓ Copiado!','ok'))" title="Copiar nome" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-size:10px;flex-shrink:0;opacity:.7;line-height:1">📋</button>${_alertaIcon}</span></td>`;
+        if (col.key === 'Sub_ID') return `<td style="text-align:left;${_alertaBg}"><span class="sub-id-link" onclick="event.stopPropagation();toggleDrill('${sid}',this.closest('tr'))" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><span class="drill-arrow" id="arr-${safeId}">▶</span>${r.Sub_ID||'—'}${_badgeDiaCampanha(r.Sub_ID)}<button onclick="event.stopPropagation();navigator.clipboard.writeText('${(r.Sub_ID||'').replace(/'/g,"\'")}').then(()=>toast('✓ Copiado!','ok'))" title="Copiar nome" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-size:10px;flex-shrink:0;opacity:.7;line-height:1">📋</button>${_alertaIcon}</span></td>`;
         return fmtCell(r[col.key], col.fmt, r);
       }).join('')
     }</tr>`;
@@ -4128,7 +4166,9 @@ async function toggleDrill(sid, trClicado) {
   const drillTrs = rowsAg.map(r => {
     const dow   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
     const dd    = r.Data ? new Date(r.Data + 'T12:00:00') : null;
-    const label = dd ? r.Data.slice(8)+'/'+r.Data.slice(5,7)+' <span style="font-size:10px;color:var(--muted)">'+dow[dd.getDay()]+'</span>' : '—';
+    const _rotD = r.Data ? _rotuloDiaCampanha(sid, r.Data) : null;
+    const label = dd ? r.Data.slice(8)+'/'+r.Data.slice(5,7)+' <span style="font-size:10px;color:var(--muted)">'+dow[dd.getDay()]+'</span>'
+      + (_rotD ? ' <span style="font-size:9px;font-weight:700;color:var(--muted);opacity:.8;">· '+_rotD+'</span>' : '') : '—';
     const _isSummary   = r._metaSummary;
     const _isSubConta  = !_isSummary && !!r._diaMulti;
     const _dtStr = r.Data || '';
@@ -4393,6 +4433,33 @@ function toggleResultadoChart() {
     sec.style.display = 'none';
   }
 }
+
+// Recolher/mostrar os cards de KPI do Dashboard — pra sobrar mais altura de tela
+// pra tabela de campanhas sem precisar rolar tanto. Preferência fica salva.
+function toggleKpiGrid(forcarEstado) {
+  const grid = document.getElementById('kpi-grid');
+  const btn  = document.getElementById('btn-toggle-kpi');
+  if (!grid || !btn) return;
+  const recolher = forcarEstado !== undefined ? forcarEstado : grid.style.display !== 'none';
+  grid.style.display = recolher ? 'none' : '';
+  btn.textContent = recolher ? '▼ Mostrar KPIs' : '▲ Recolher KPIs';
+  localStorage.setItem('ad_kpi_recolhido', recolher ? '1' : '0');
+  _ajustarAlturaTabelaDash();
+}
+function _restaurarEstadoKpiGrid() {
+  if (localStorage.getItem('ad_kpi_recolhido') === '1') toggleKpiGrid(true);
+}
+// Redimensiona a tabela do Dashboard pra ocupar o espaço realmente disponível
+// na tela, em vez de uma altura fixa — assim, recolher os KPIs de fato mostra
+// mais linhas, não só sobra espaço em branco embaixo.
+function _ajustarAlturaTabelaDash() {
+  const wrap = document.querySelector('#page-dashboard .tbl-wrap');
+  if (!wrap || !document.getElementById('page-dashboard')?.classList.contains('active')) return;
+  const topo = wrap.getBoundingClientRect().top;
+  const altura = Math.max(220, window.innerHeight - topo - 16);
+  wrap.style.maxHeight = altura + 'px';
+}
+window.addEventListener('resize', () => _ajustarAlturaTabelaDash());
 
 function renderResultadoChart() {
   const sec     = document.getElementById('section-resultado');
@@ -6051,6 +6118,17 @@ function toast(msg, tipo) {
 // DATAS ESPECIAIS
 // ═══════════════════════════════════════════
 let CFG_DATAS = carregar('cfg_datas', []);
+// Motivos de pausa configuráveis — antes eram 2 listas fixas no código (modal de
+// pausar + coluna da tabela), agora vêm daqui. 'alerta' = destaca em vermelho na
+// coluna "Motivo Pausa" da aba Campanhas. Mantém os mesmos valores/ordem de antes
+// como padrão, pra não mudar nada pra quem já usa — só passa a ser editável.
+let CFG_MOTIVOS_PAUSA = carregar('cfg_motivos_pausa', [
+  { id: 'mp1', nome: 'RETESTAR',      alerta: true  },
+  { id: 'mp2', nome: 'EMPATE',        alerta: true  },
+  { id: 'mp3', nome: 'CPC ALTO',      alerta: false },
+  { id: 'mp4', nome: 'DATA ESPECIAL', alerta: true  },
+  { id: 'mp5', nome: 'DIF CLIQUE',    alerta: true  },
+]);
 // Estrutura: [ {id, nome, data, cor} ]
 
 const CORES_DATA = [
@@ -6624,6 +6702,94 @@ function opsDrop(e,i) {
 function opsDragEnd(e) { e.currentTarget.style.opacity=''; e.currentTarget.style.background=''; _opsDragIdx=null; }
 
 // ═══════════════════════════════════════════
+// CONFIG — Motivos de pausa (aba Configuração → Motivos de Pausa)
+// Usados no modal de pausar campanha (pausarCamp) e na coluna "Motivo Pausa"
+// da aba Campanhas — antes eram 2 listas fixas no código, agora vêm daqui.
+// ═══════════════════════════════════════════
+function renderMotivosPausa() {
+  const el = document.getElementById('motivos-pausa-list');
+  if (!el) return;
+  if (!CFG_MOTIVOS_PAUSA.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Nenhum motivo cadastrado ainda.</div>';
+    return;
+  }
+  el.innerHTML = CFG_MOTIVOS_PAUSA.map((m, i) => `
+    <div draggable="true" ondragstart="motivosPausaDragStart(event,${i})" ondragover="motivosPausaDragOver(event)"
+      ondrop="motivosPausaDrop(event,${i})" ondragend="motivosPausaDragEnd(event)"
+      style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:grab;">
+      <span style="color:var(--muted);font-size:14px;">⠿</span>
+      <input type="text" value="${esc(m.nome||'')}" placeholder="Ex: RETESTAR"
+        style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--font);outline:none;"
+        onchange="updateMotivoPausa('${m.id}','nome',this.value)">
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer;">
+        <input type="checkbox" ${m.alerta ? 'checked' : ''} onchange="updateMotivoPausa('${m.id}','alerta',this.checked)">
+        Destacar em vermelho
+      </label>
+      <button onclick="removerMotivoPausa('${m.id}')"
+        style="font-size:11px;padding:2px 7px;border:1px solid var(--red-bdr);border-radius:5px;background:transparent;color:var(--red);cursor:pointer;">✕</button>
+    </div>`).join('');
+}
+
+function adicionarMotivoPausa() {
+  CFG_MOTIVOS_PAUSA.push({ id: uid(), nome: '', alerta: false });
+  salvar('cfg_motivos_pausa', CFG_MOTIVOS_PAUSA);
+  renderMotivosPausa();
+}
+
+function updateMotivoPausa(id, campo, valor) {
+  const m = CFG_MOTIVOS_PAUSA.find(x => x.id === id);
+  if (!m) return;
+  if (campo === 'nome') {
+    const nomeAntigo = m.nome;
+    const nomeNovo = valor;
+    m.nome = nomeNovo;
+    // Cascata: campanhas já marcadas com o nome antigo acompanham a mudança,
+    // senão ficariam com um texto "órfão" que não existe mais na lista.
+    if (nomeAntigo && nomeAntigo !== nomeNovo) {
+      let afetadas = 0;
+      Object.values(CFG_CAMPANHAS).forEach(c => {
+        if (c && c.motivo_pausa === nomeAntigo) { c.motivo_pausa = nomeNovo; afetadas++; }
+      });
+      if (afetadas > 0) { salvar('cfg_campanhas', CFG_CAMPANHAS); renderCampanhas(); }
+    }
+  } else {
+    m[campo] = valor;
+  }
+  salvar('cfg_motivos_pausa', CFG_MOTIVOS_PAUSA);
+  if (campo === 'alerta') renderCampanhas(); // o destaque vermelho pode mudar na tabela
+}
+
+function removerMotivoPausa(id) {
+  const m = CFG_MOTIVOS_PAUSA.find(x => x.id === id);
+  if (!m) return;
+  const emUso = Object.values(CFG_CAMPANHAS).filter(c => c && c.motivo_pausa === m.nome).length;
+  if (emUso > 0) {
+    const ok = confirm(`"${m.nome}" está em uso em ${emUso} campanha(s). Se remover, essas campanhas voltam pra "—" (sem motivo). Remover mesmo assim?`);
+    if (!ok) return;
+    Object.values(CFG_CAMPANHAS).forEach(c => { if (c && c.motivo_pausa === m.nome) c.motivo_pausa = ''; });
+    salvar('cfg_campanhas', CFG_CAMPANHAS);
+    renderCampanhas();
+  }
+  CFG_MOTIVOS_PAUSA = CFG_MOTIVOS_PAUSA.filter(x => x.id !== id);
+  salvar('cfg_motivos_pausa', CFG_MOTIVOS_PAUSA);
+  renderMotivosPausa();
+}
+
+let _dragIdxMotivos = null;
+function motivosPausaDragStart(e, idx) { _dragIdxMotivos = idx; e.currentTarget.style.opacity = '0.4'; }
+function motivosPausaDragOver(e) { e.preventDefault(); e.currentTarget.style.background = 'var(--blue-bg)'; }
+function motivosPausaDrop(e, idx) {
+  e.preventDefault();
+  e.currentTarget.style.background = '';
+  if (_dragIdxMotivos === null || _dragIdxMotivos === idx) return;
+  const moved = CFG_MOTIVOS_PAUSA.splice(_dragIdxMotivos, 1)[0];
+  CFG_MOTIVOS_PAUSA.splice(idx, 0, moved);
+  salvar('cfg_motivos_pausa', CFG_MOTIVOS_PAUSA);
+  renderMotivosPausa();
+}
+function motivosPausaDragEnd(e) { e.currentTarget.style.opacity = ''; e.currentTarget.style.background = ''; _dragIdxMotivos = null; }
+
+// ═══════════════════════════════════════════
 // CONFIG — contas Shopee e Meta "vivas"
 // ═══════════════════════════════════════════
 
@@ -7072,6 +7238,25 @@ function autoSalvarConfig() {
     CFG.intervalo      = iv;
     CFG.metas = {};
     CFG_SHOPEE.forEach(ct => { if (ct.nome) CFG.metas[ct.nome] = ct.meta || 0; });
+
+    // Faixas de classificação de campanha (aba Classificação) — "Campeão" não tem
+    // campo próprio editável: é sempre "acima de Bom", então o input fica travado
+    // espelhando o valor de Bom (mesmo padrão já usado em Evasão de Grupo/Custo Lead).
+    const mgdPess  = parseFloat(document.getElementById('mgd-pess')?.value);
+    const mgdFraco = parseFloat(document.getElementById('mgd-fraco')?.value);
+    const mgdMed   = parseFloat(document.getElementById('mgd-med')?.value);
+    const mgdBom   = parseFloat(document.getElementById('mgd-bom')?.value);
+    if (!isNaN(mgdPess) || !isNaN(mgdFraco) || !isNaN(mgdMed) || !isNaN(mgdBom)) {
+      CFG.mgd = {
+        pess:  !isNaN(mgdPess)  ? mgdPess  : (CFG.mgd?.pess  ?? 0.83),
+        fraco: !isNaN(mgdFraco) ? mgdFraco : (CFG.mgd?.fraco ?? 1.07),
+        med:   !isNaN(mgdMed)   ? mgdMed   : (CFG.mgd?.med   ?? 1.24),
+        bom:   !isNaN(mgdBom)   ? mgdBom   : (CFG.mgd?.bom   ?? 1.65),
+      };
+      const campEl = document.getElementById('mgd-camp');
+      if (campEl) campEl.value = CFG.mgd.bom; // espelha Bom, é só exibição
+    }
+
     salvar('cfg', CFG);
     salvar('cfg_shopee', CFG_SHOPEE);
     salvar('cfg_meta', CFG_META);
@@ -8533,6 +8718,53 @@ function _marcarDADOSAlterados() {
   _dadosIndiceCache = { chave: '', valor: null };
   _kpisPeriodoCache = { chave: '', valor: null };
   _periodoBaseCache = { chave: '', valor: null };
+  _primeiraDataGastoCache = {};
+}
+
+// ═══════════════════════════════════════════
+// D-DIA da campanha (D0, D1, D2... — metodologia MGD)
+// D0 = primeiro dia com gasto Meta registrado pra aquele sub_id, entre TODOS os
+// dados já carregados no app (não só o período em exibição na tela). Se a
+// campanha for antiga e o histórico dela nunca foi puxado (botão "Carregar mês
+// anterior"), o D calculado aqui reflete o primeiro dia que o app enxerga, que
+// pode ser maior que o D0 real — não dá pra distinguir os dois casos sem uma
+// consulta extra ao Supabase a cada render.
+// ═══════════════════════════════════════════
+let _primeiraDataGastoCache = {}; // sid (lowercase) -> 'YYYY-MM-DD' | null
+
+function _primeiraDataGasto(sid) {
+  const key = (sid || '').toLowerCase();
+  if (!key) return null;
+  if (key in _primeiraDataGastoCache) return _primeiraDataGastoCache[key];
+  let min = null;
+  for (const r of DADOS) {
+    if (r.Plataforma !== 'meta') continue;
+    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
+    if (!(Number(r.Gasto_Meta) > 0)) continue;
+    const d = normData(r.Data);
+    if (d && (!min || d < min)) min = d;
+  }
+  _primeiraDataGastoCache[key] = min;
+  return min;
+}
+
+// 'D0','D1','D2'... relativo ao 1º dia com gasto daquele sub_id. null se não
+// tiver histórico de gasto carregado ainda, ou se a data pedida for anterior
+// ao 1º gasto (não deveria acontecer, mas evita mostrar "D-3" sem sentido).
+function _rotuloDiaCampanha(sid, dataStr) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0 || !dataStr) return null;
+  const diff = Math.round((new Date(dataStr + 'T00:00:00') - new Date(d0 + 'T00:00:00')) / 86400000);
+  return diff < 0 ? null : 'D' + diff;
+}
+
+// Selo "D12" pra usar perto do nome da campanha (fase atual, baseada em hoje)
+function _badgeDiaCampanha(sid) {
+  const _h = new Date();
+  const hoje = _h.getFullYear() + '-' + String(_h.getMonth()+1).padStart(2,'0') + '-' + String(_h.getDate()).padStart(2,'0');
+  const lbl = _rotuloDiaCampanha(sid, hoje);
+  if (!lbl) return '';
+  return `<span title="Fase da campanha — ${lbl} desde o primeiro gasto registrado" style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);white-space:nowrap;">${lbl}</span>`;
 }
 
 function _mensalAssinaturaCache(escopo) {
@@ -9538,6 +9770,7 @@ function renderCampanhas() {
   const r2 = n=>'R$ '+n.toFixed(2).replace('.',',');
   const fN = n=>n.toFixed(2).replace('.',',');
   const TIPOS_CAMP = ['NOVO', 'RETESTE', 'VARIAÇÃO', 'DUP', 'OUTRO'];
+  const MOTIVOS_PAUSA_ALERTA = CFG_MOTIVOS_PAUSA.filter(m => m.alerta).map(m => m.nome);
   const MESES_CAMP = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
   // ── ROAS: datas e mapa ── construídos ANTES de filtrar/ordenar
@@ -9765,6 +9998,7 @@ function _campRenderCampanhasTabela() {
         <input type="checkbox" class="camp-sel-chk" ${jaSelecionado?'checked':''} onclick="event.stopPropagation();_campToggleLinha(this.closest('tr'))"
           style="width:13px;height:13px;cursor:pointer;vertical-align:middle;margin-right:6px;accent-color:#2563eb;">
         <span style="font-size:11px;font-weight:500">${esc(c.Sub_ID)}</span>
+        ${_badgeDiaCampanha(c.Sub_ID)}
         <button onclick="event.stopPropagation();navigator.clipboard.writeText('${esc(c.Sub_ID)}').then(()=>toast('✓ Copiado!','ok'))"
           title="Copiar nome"
           style="margin-left:5px;padding:1px 5px;font-size:9px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;opacity:.6;">📋</button>
@@ -9830,11 +10064,11 @@ function _campRenderCampanhasTabela() {
         </div>
       </td>
       <td>
-        <select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--bg2);color:${['RETESTAR','EMPATE','DATA ESPECIAL'].includes(cfg.motivo_pausa)?'#dc2626':'var(--text)'};"
+        <select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--bg2);color:${MOTIVOS_PAUSA_ALERTA.includes(cfg.motivo_pausa)?'#dc2626':'var(--text)'};"
           onclick="event.stopPropagation()"
-          onchange="event.stopPropagation();_campSet('${sid}','motivo_pausa',this.value);this.style.color=['RETESTAR','EMPATE','DATA ESPECIAL','DIF CLIQUE'].includes(this.value)?'#dc2626':'var(--text)'">
+          onchange="event.stopPropagation();_campSet('${sid}','motivo_pausa',this.value);this.style.color=MOTIVOS_PAUSA_ALERTA.includes(this.value)?'#dc2626':'var(--text)'">
           <option value="">—</option>
-          ${'—,RETESTAR,EMPATE,CPC ALTO,DATA ESPECIAL,DIF CLIQUE'.split(',').map(m=>'<option value="'+m+'" '+(cfg.motivo_pausa===m?'selected':'')+'>'+m+'</option>').join('')}
+          ${CFG_MOTIVOS_PAUSA.map(m=>'<option value="'+esc(m.nome)+'" '+(cfg.motivo_pausa===m.nome?'selected':'')+'>'+esc(m.nome)+'</option>').join('')}
         </select>
       </td>
       <td style="text-align:center">
@@ -12760,6 +12994,7 @@ function showPage(id, btn) {
   }
   if (id==='dashboard') {
     render(); // garante que a aba principal reflita a conta/filtro atual ao abrir
+    _ajustarAlturaTabelaDash();
     return;
   }
   if (id==='criativo')    renderCriativo();
@@ -12950,6 +13185,15 @@ function initConfig() {
   const a = document.getElementById('cfg-aliquota');    if (a) a.value = ((CFG.aliquota_cnpj||0.06)*100).toFixed(2);
   const b = document.getElementById('cfg-cancelamento'); if (b) b.value = ((CFG.cancelamento||0.08)*100).toFixed(1);
   const r = document.getElementById('cfg-roas-fator');  if (r) r.value = (CFG.roas_liq_fator||0.826).toFixed(3);
+  // Restaura faixas de classificação de campanha (se já tiver sido salva antes —
+  // senão fica nos valores padrão que já estão no HTML)
+  if (CFG.mgd) {
+    const mp = document.getElementById('mgd-pess');  if (mp) mp.value = CFG.mgd.pess  ?? 0.83;
+    const mf = document.getElementById('mgd-fraco'); if (mf) mf.value = CFG.mgd.fraco ?? 1.07;
+    const mm = document.getElementById('mgd-med');   if (mm) mm.value = CFG.mgd.med   ?? 1.24;
+    const mb = document.getElementById('mgd-bom');   if (mb) mb.value = CFG.mgd.bom   ?? 1.65;
+    const mc = document.getElementById('mgd-camp');  if (mc) mc.value = CFG.mgd.bom   ?? 1.65;
+  }
   // Restaura classificação de evasão de grupo e custo por lead (se já tiver sido salva antes)
   if (CFG.evasao_grupo) {
     const ev1 = document.getElementById('evasao-grp-verde');   if (ev1) ev1.value = CFG.evasao_grupo.verde;
@@ -13335,6 +13579,8 @@ _carregarConfigServidor().then(carregouServidor => {
   });
   setInterval(() => whatsAtualizarGrupos(true), 5 * 60 * 1000);
   _carregarComissoes();
+  _restaurarEstadoKpiGrid();
+  _ajustarAlturaTabelaDash();
 });
 </script>
 </body>

@@ -138,6 +138,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 .b-med   { background:var(--yellow-bg); color:var(--yellow); }
 .b-fraco { background:#ffedd5; color:#9a3412; }
 .b-pess  { background:var(--red-bg); color:var(--red); }
+.b-aguardar { background:var(--bg3); color:var(--muted); }
 
 /* ── DETAIL ── */
 .detail-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
@@ -685,6 +686,18 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       </table>
     </div>
 </div>
+</div>
+<!-- ══════════════════════════════════════════
+     PÁGINA: ANÁLISE MGD (veredito por campanha, D0 ao D10+)
+══════════════════════════════════════════ -->
+<div class="page" id="page-analise-mgd">
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <div style="width:230px;flex-shrink:0;background:var(--bg2);border-radius:10px;padding:10px;max-height:calc(100vh - 160px);overflow-y:auto;">
+      <div style="font-size:12px;color:var(--muted);margin:0 0 8px;padding:0 4px;">Campanhas ativas</div>
+      <div id="mgd-lista-campanhas"></div>
+    </div>
+    <div style="flex:1;min-width:0;" id="mgd-detalhe"></div>
+  </div>
 </div>
 <!-- ══════════════════════════════════════════
      PÁGINA: GRUPOS WHATS
@@ -1857,6 +1870,7 @@ function _mapMeta(r) {
     Venda_Direta:  0,
     Gasto_Meta:    Number(r.gasto)         || 0,
     Cliques_Meta:  Number(r.cliques_link)  || 0,
+    Impressoes:    Number(r.impressoes)    || 0,
     Cliques_Shopee:0,
     Pedidos_Total: 0,
     _contaMeta_id: r.conta_meta_id || '',
@@ -5678,6 +5692,7 @@ async function _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampan
         Plataforma:    'meta',
         Gasto_Meta:    parseFloat(r.spend)||0,
         Cliques_Meta:  parseInt(r.clicks)||0,
+        Impressoes:    parseInt(r.impressions)||0,
         _meta_status:  effStatus,
         Comissao:      0,
         Pedidos_Total: 0,
@@ -5703,7 +5718,7 @@ async function _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampan
 
   if (!temUnica && !temMultipla) {
     // Fallback de segurança: sem info de nível disponível (ex: status falhou) — busca tudo por campanha, como antes
-    const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=campaign&limit=500&access_token=${contaMeta.token}`;
+    const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,impressions,date_start&time_range=${timeRange}&time_increment=1&level=campaign&limit=500&access_token=${contaMeta.token}`;
     await buscarPaginado(url, 'campaign_name');
     return rows;
   }
@@ -5711,14 +5726,14 @@ async function _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampan
     if (temUnica) {
            for (const lote of _chunkArray(idsCampanhaUnica, 80)) {
              const filtering = encodeURIComponent(JSON.stringify([{ field:'campaign.id', operator:'IN', value: lote }]));
-             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
+             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=campaign_name,spend,clicks,impressions,date_start&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
              await buscarPaginado(url, 'campaign_name');
      }
      }
          if (temMultipla) {
            for (const lote of _chunkArray(idsAnuncioMultiplo, 80)) {
              const filtering = encodeURIComponent(JSON.stringify([{ field:'ad.id', operator:'IN', value: lote }]));
-             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=ad_name,spend,clicks,date_start&time_range=${timeRange}&time_increment=1&level=ad&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
+             const url = `https://graph.facebook.com/v19.0/${actId}/insights?fields=ad_name,spend,clicks,impressions,date_start&time_range=${timeRange}&time_increment=1&level=ad&filtering=${filtering}&limit=500&access_token=${contaMeta.token}`;
              await buscarPaginado(url, 'ad_name');
            }
          }
@@ -5876,6 +5891,7 @@ async function _salvarMetaLote(dadosArr) {
     else {
       _metaDedup[k].Gasto_Meta    = (_metaDedup[k].Gasto_Meta||0)    + (r.Gasto_Meta||0);
       _metaDedup[k].Cliques_Meta  = (_metaDedup[k].Cliques_Meta||0)  + (r.Cliques_Meta||0);
+      _metaDedup[k].Impressoes    = (_metaDedup[k].Impressoes||0)    + (r.Impressoes||0);
     }
   });
   const metaV3 = Object.values(_metaDedup).map(r => ({
@@ -5886,6 +5902,7 @@ async function _salvarMetaLote(dadosArr) {
     status_camp:    r._meta_status || null,
     gasto:          Number(r.Gasto_Meta)    || 0,
     cliques_link:   Number(r.Cliques_Meta)  || 0,
+    impressoes:     Number(r.Impressoes)    || 0,
   }));
   const LOTE = 300;
   let ok = 0, erros = [];
@@ -6840,10 +6857,11 @@ let CFG_SHOPEE = carregar('cfg_shopee', []);
 let CFG_META = carregar('cfg_meta', []);
 const _navAbasPadrao = () => ([
   { id:'campanhas', label:'Campanhas', icon:'🚀', desc:'Gerencia campanhas, orçamento e plataforma vigente.', visible:true, ordem:1 },
-  { id:'pedidos', label:'Pedidos', icon:'📋', desc:'Mostra pedidos, status e comissões por plataforma.', visible:true, ordem:2 },
-  { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:3 },
-  { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:4 },
-  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:5 },
+  { id:'analise-mgd', label:'Análise MGD', icon:'🎯', desc:'Veredito diário por campanha, do D0 ao D10+, com o motivo de cada decisão.', visible:true, ordem:2 },
+  { id:'pedidos', label:'Pedidos', icon:'📋', desc:'Mostra pedidos, status e comissões por plataforma.', visible:true, ordem:3 },
+  { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:4 },
+  { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:5 },
+  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:6 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -6967,6 +6985,8 @@ function renderNavAbas() {
       icon: a.icon,
       onclick: a.id === 'pedidos'
         ? "showPage('pedidos',this);_renderPedidosComOpacidade()"
+        : a.id === 'analise-mgd'
+        ? "showPage('analise-mgd',this);renderAnaliseMGD()"
         : `showPage('${a.id}',this)`,
     })),
   ];
@@ -8920,6 +8940,355 @@ function _cpcD0Campanha(sid) {
   return cliques > 0 ? gasto / cliques : null;
 }
 
+// ═══════════════════════════════════════════
+// MOTOR DE VEREDITO MGD (Aula 6 — Análise de Métricas, do D0 ao D7+)
+// Breakeven real da Benetti: 1,22 (substitui o 1,31 do material de referência).
+// "ROI" no material = ROAS líquido (comissão − imposto) / gasto, sempre.
+// ═══════════════════════════════════════════
+const MGD_BREAKEVEN = 1.22;
+// Faixas de pré-escala (D6+), ajustadas proporcionalmente do material original
+// (1,3-1,5/1,5-2/2+ com breakeven 1,31) pro breakeven real de 1,22.
+const MGD_FAIXA_MEDIANO = 1.21, MGD_FAIXA_BOM = 1.40, MGD_FAIXA_CAMPEAO = 1.86;
+
+// Histórico diário completo de uma campanha, cruzando Meta (gasto/cliques/
+// impressões) e Shopee (comissão/imposto/pedidos/cliques) por data. Base de
+// tudo que o motor de veredito usa — sem isso, cada regra teria que escanear
+// DADOS de novo.
+function _historicoDiarioCampanha(sid) {
+  const key = (sid || '').toLowerCase();
+  const porDia = {};
+  const get = dt => { if (!porDia[dt]) porDia[dt] = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0 }; return porDia[dt]; };
+  for (const r of DADOS) {
+    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
+    const dt = normData(r.Data);
+    if (!dt) continue;
+    if (r.Plataforma === 'meta') {
+      const m = get(dt);
+      m.gastoMeta   += Number(r.Gasto_Meta)   || 0;
+      m.cliquesMeta += Number(r.Cliques_Meta) || 0;
+      m.impressoes  += Number(r.Impressoes)   || 0;
+    } else if (r.Plataforma === 'shopee') {
+      const m = get(dt);
+      m.cliquesShopee += Number(r.Cliques_Shopee) || 0;
+      if (r.Status === 'PENDING' || r.Status === 'COMPLETED') {
+        const com  = Number(r.Comissao) || 0;
+        const aliq = getAliquotaFiscal(r.Conta, r.Data);
+        m.comissao += com;
+        m.imposto  += com * aliq;
+        m.pedidos  += 1;
+      }
+    }
+  }
+  return porDia;
+}
+
+// Roda a régua completa do dia atual da campanha e devolve o veredito.
+// Retorna: { dia, fase, veredito, motivo, classificacao, roasAcumulado }
+function _analisarMGD(sid, diaForcado) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return { dia: null, fase: '—', veredito: null, motivo: 'Sem histórico de gasto ainda', classificacao: null, roasAcumulado: null };
+
+  let diaAtual;
+  if (diaForcado != null) {
+    diaAtual = diaForcado;
+  } else {
+    const _h = new Date();
+    const hojeStr = _h.getFullYear() + '-' + String(_h.getMonth()+1).padStart(2,'0') + '-' + String(_h.getDate()).padStart(2,'0');
+    diaAtual = Math.round((new Date(hojeStr+'T00:00:00') - new Date(d0+'T00:00:00')) / 86400000);
+  }
+  if (diaAtual < 0) return { dia: null, fase: '—', veredito: null, motivo: 'Data inconsistente', classificacao: null, roasAcumulado: null };
+
+  const porDia = _historicoDiarioCampanha(sid);
+  const vazio = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0 };
+  const diaData = n => { const d = new Date(d0+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const m = n => porDia[diaData(n)] || vazio;
+  const roasAcumuladoAte = n => {
+    let g=0,c=0,i=0;
+    for (let k = 0; k <= n; k++) { const mm = m(k); g+=mm.gastoMeta; c+=mm.comissao; i+=mm.imposto; }
+    return g > 0 ? (c - i) / g : 0;
+  };
+  const fmtR = v => v.toFixed(2).replace('.', ',');
+  const classificar = roas => roas >= MGD_FAIXA_CAMPEAO ? 'Campeão' : roas >= MGD_FAIXA_BOM ? 'Bom' : roas >= MGD_FAIXA_MEDIANO ? 'Mediano' : null;
+
+  // ── D0 — só CPC, e só depois de R$8 gastos ──
+  if (diaAtual === 0) {
+    const m0 = m(0);
+    if (m0.gastoMeta < 8)
+      return { dia:0, fase:'D0', veredito:'AGUARDAR', motivo:`Ainda gastou só R$${fmtR(m0.gastoMeta)} — só avalia CPC a partir de R$8`, classificacao:null, roasAcumulado:0 };
+    if (m0.cliquesMeta <= 0)
+      return { dia:0, fase:'D0', veredito:'AGUARDAR', motivo:'Gastou R$8+ mas ainda sem cliques registrados', classificacao:null, roasAcumulado:0 };
+    const cpc = m0.gastoMeta / m0.cliquesMeta;
+    if (cpc > 0.30) return { dia:0, fase:'D0', veredito:'DESATIVAR', motivo:`CPC R$${fmtR(cpc)} — acima de R$0,30, desativar imediatamente`, classificacao:null, roasAcumulado:0 };
+    if (cpc > 0.20) return { dia:0, fase:'D0', veredito:'ATENÇÃO',   motivo:`CPC R$${fmtR(cpc)} — acima de R$0,20`, classificacao:null, roasAcumulado:0 };
+    if (cpc > 0.15) return { dia:0, fase:'D0', veredito:'MANTER',    motivo:`CPC R$${fmtR(cpc)} — ok com atenção, tende a cair amanhã`, classificacao:null, roasAcumulado:0 };
+    return { dia:0, fase:'D0', veredito:'MANTER', motivo:`CPC R$${fmtR(cpc)} — ideal`, classificacao:null, roasAcumulado:0 };
+  }
+
+  // ── D1 — ordem: CPC → Orçamento → Cliques → Pedidos → ROAS ──
+  if (diaAtual === 1) {
+    const m1 = m(1);
+    if (m1.impressoes >= 500) {
+      const ctr = m1.cliquesMeta / m1.impressoes;
+      if (ctr <= 0.015)
+        return { dia:1, fase:'D1', veredito:'DESATIVAR', motivo:`CTR ${fmtR(ctr*100)}% com ${m1.impressoes} impressões — corte automático`, classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    }
+    if (m1.gastoMeta >= 50 && m1.pedidos === 0)
+      return { dia:1, fase:'D1', veredito:'DESATIVAR', motivo:`Zero pedidos e já gastou R$${fmtR(m1.gastoMeta)}`, classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+
+    const cpc = m1.cliquesMeta > 0 ? m1.gastoMeta / m1.cliquesMeta : null;
+    const cpcBom  = cpc != null && cpc < 0.15;
+    const cpcCaro = cpc != null && cpc > 0.20;
+    const cliquesBateram = m1.cliquesShopee >= m1.cliquesMeta;
+    const temPedidos     = m1.pedidos > 0;
+
+    if (temPedidos && cpcBom && cliquesBateram)
+      return { dia:1, fase:'D1', veredito:'MANTER', motivo:'Excelente: teve pedidos, CPC bom e cliques Shopee ≥ Meta', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    if (temPedidos)
+      return { dia:1, fase:'D1', veredito:'MANTER', motivo:'Bom: teve pedidos no D1', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    if (!temPedidos && cliquesBateram)
+      return { dia:1, fase:'D1', veredito:'MANTER', motivo:'Atenção: zero pedidos mas cliques Shopee ≥ Meta — mantém +1 dia', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    if (!temPedidos && !cliquesBateram && cpcCaro)
+      return { dia:1, fase:'D1', veredito:'DESATIVAR', motivo:'Péssimo: zero pedidos, CPC caro e cliques não bateram', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    if (!temPedidos && !cliquesBateram)
+      return { dia:1, fase:'D1', veredito:'DESATIVAR', motivo:'Ruim: zero pedidos e cliques Shopee abaixo de Meta', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+    return { dia:1, fase:'D1', veredito:'AGUARDAR', motivo:'Dados insuficientes ainda', classificacao:null, roasAcumulado:roasAcumuladoAte(1) };
+  }
+
+  // ── D2 ──
+  if (diaAtual === 2) {
+    const roasAc = roasAcumuladoAte(2);
+    if (roasAc <= 0.05) return { dia:2, fase:'D2', veredito:'DESATIVAR', motivo:`ROAS acumulado ${fmtR(roasAc)} — corte automático (≤0,05)`, classificacao:null, roasAcumulado:roasAc };
+    if (roasAc >= MGD_BREAKEVEN) return { dia:2, fase:'D2', veredito:'MANTER', motivo:`ROAS acumulado ${fmtR(roasAc)} já empatou — segue pro D3`, classificacao:null, roasAcumulado:roasAc };
+    if (roasAc <= 0.15) return { dia:2, fase:'D2', veredito:'ATENÇÃO', motivo:`ROAS acumulado ${fmtR(roasAc)} — baixo, fica de olho`, classificacao:null, roasAcumulado:roasAc };
+    return { dia:2, fase:'D2', veredito:'MANTER', motivo:`ROAS acumulado ${fmtR(roasAc)} — ainda testando`, classificacao:null, roasAcumulado:roasAc };
+  }
+
+  // ── D3 — penúltimo dia, mais exigência ──
+  if (diaAtual === 3) {
+    const roasAc = roasAcumuladoAte(3);
+    const m3 = m(3);
+    const conv = m3.cliquesMeta > 0 ? m3.pedidos / m3.cliquesMeta : null;
+    if (conv != null && m3.cliquesMeta >= 120 && conv <= 0.008)
+      return { dia:3, fase:'D3', veredito:'DESATIVAR', motivo:`Conversão ${fmtR(conv*100)}% com ${m3.cliquesMeta} cliques — corte automático`, classificacao:null, roasAcumulado:roasAc };
+    if (roasAc >= MGD_BREAKEVEN)
+      return { dia:3, fase:'D3', veredito:'MANTER', motivo:`ROAS acumulado ${fmtR(roasAc)} já empatou — segue pro D4`, classificacao:null, roasAcumulado:roasAc };
+    if (roasAc <= 0.40)
+      return { dia:3, fase:'D3', veredito:'ATENÇÃO', motivo:`ROAS acumulado ${fmtR(roasAc)} — baixo (cuidado, slow-starter existe)`, classificacao:null, roasAcumulado:roasAc };
+    const pedidosCrescendo = m3.pedidos >= m(2).pedidos;
+    if (pedidosCrescendo)
+      return { dia:3, fase:'D3', veredito:'MANTER', motivo:'Último dia de tolerância — pedidos crescendo', classificacao:null, roasAcumulado:roasAc };
+    return { dia:3, fase:'D3', veredito:'DESATIVAR', motivo:'ROAS não empatou e pedidos não cresceram — não vai virar no D4', classificacao:null, roasAcumulado:roasAc };
+  }
+
+  // ── D4 — decisão final ──
+  if (diaAtual === 4) {
+    const roasAc = roasAcumuladoAte(4);
+    const m4 = m(4);
+    const conv = m4.cliquesMeta > 0 ? m4.pedidos / m4.cliquesMeta : null;
+    if (conv != null && m4.cliquesMeta >= 150 && conv <= 0.011)
+      return { dia:4, fase:'D4', veredito:'DESATIVAR', motivo:`Conversão ${fmtR(conv*100)}% com ${m4.cliquesMeta} cliques — corte automático`, classificacao:null, roasAcumulado:roasAc };
+    if (roasAc >= MGD_BREAKEVEN)
+      return { dia:4, fase:'D4', veredito:'VALIDADO', motivo:`ROAS acumulado ${fmtR(roasAc)} — empatou! Validado, vai pra pré-escala`, classificacao:null, roasAcumulado:roasAc };
+    return { dia:4, fase:'D4', veredito:'DESATIVAR', motivo:`ROAS acumulado ${fmtR(roasAc)} — não empatou no dia da decisão (breakeven ${MGD_BREAKEVEN})`, classificacao:null, roasAcumulado:roasAc };
+  }
+
+  // ── D5-D9 — pré-escala, muda a mentalidade ──
+  if (diaAtual >= 5 && diaAtual <= 9) {
+    const roasAc = roasAcumuladoAte(diaAtual);
+    // Regra especial: ROAS líquido diário < 0,5 por 3 dias seguidos E acumulado < breakeven → pausa
+    const ult3 = [diaAtual, diaAtual-1, diaAtual-2].map(n => { const mm = m(n); return mm.gastoMeta > 0 ? (mm.comissao - mm.imposto) / mm.gastoMeta : null; });
+    const todasBaixas = ult3.every(v => v != null && v < 0.5);
+    if (todasBaixas && roasAc < MGD_BREAKEVEN)
+      return { dia:diaAtual, fase:'D'+diaAtual, veredito:'PAUSAR', motivo:'ROAS líquido diário < 0,5 por 3 dias seguidos e acumulado abaixo do breakeven', classificacao:null, roasAcumulado:roasAc };
+    if (diaAtual === 5)
+      return { dia:5, fase:'D5', veredito:'MANTER', motivo:`Estabilização — ROAS acumulado ${fmtR(roasAc)}, mesmo orçamento, só observa`, classificacao:null, roasAcumulado:roasAc };
+    const classe = classificar(roasAc);
+    return { dia:diaAtual, fase:'D'+diaAtual, veredito: classe ? 'MANTER' : 'ATENÇÃO', motivo: classe ? `Classificado como ${classe} (ROAS ${fmtR(roasAc)})` : `ROAS ${fmtR(roasAc)} — ainda abaixo de Mediano (${MGD_FAIXA_MEDIANO})`, classificacao: classe, roasAcumulado: roasAc };
+  }
+
+  // ── D10+ — julga pela janela dos últimos 7 dias, nunca por 1 dia isolado ──
+  let gasto7=0, com7=0, imp7=0;
+  for (let n = diaAtual-6; n <= diaAtual; n++) { const mm = m(n); gasto7+=mm.gastoMeta; com7+=mm.comissao; imp7+=mm.imposto; }
+  const roas7 = gasto7 > 0 ? (com7 - imp7) / gasto7 : 0;
+  const classe7 = classificar(roas7);
+  return {
+    dia: diaAtual, fase: 'D'+diaAtual+'+',
+    veredito: roas7 >= MGD_BREAKEVEN ? 'MANTER' : 'ATENÇÃO',
+    motivo: `Janela de 7 dias: ROAS médio ${fmtR(roas7)}${classe7 ? ' ('+classe7+')' : ''}`,
+    classificacao: classe7,
+    roasAcumulado: roas7,
+  };
+}
+
+// Detalha as métricas usadas na regra daquele dia específico, com indicador
+// bom/ruim — alimenta o checklist visual da aba Análise MGD.
+function _metricasDetalhadasDia(sid, dia) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0 || dia == null) return [];
+  const porDia = _historicoDiarioCampanha(sid);
+  const vazio = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0 };
+  const diaData = n => { const d = new Date(d0+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const m = n => porDia[diaData(n)] || vazio;
+  const roasAcumuladoAte = n => {
+    let g=0,c=0,i=0;
+    for (let k = 0; k <= n; k++) { const mm = m(k); g+=mm.gastoMeta; c+=mm.comissao; i+=mm.imposto; }
+    return g > 0 ? (c - i) / g : 0;
+  };
+  const fmtR = v => v.toFixed(2).replace('.', ',');
+  const itens = [];
+
+  if (dia === 0) {
+    const m0 = m(0);
+    itens.push({ label:'Gasto do dia', bom: m0.gastoMeta>=8, valor:`R$ ${fmtR(m0.gastoMeta)}` });
+    if (m0.gastoMeta >= 8 && m0.cliquesMeta > 0) {
+      const cpc = m0.gastoMeta/m0.cliquesMeta;
+      itens.push({ label:'CPC', bom: cpc<0.20, valor:`R$ ${fmtR(cpc)}` });
+    }
+    return itens;
+  }
+  if (dia === 1) {
+    const m1 = m(1);
+    const cpc = m1.cliquesMeta>0 ? m1.gastoMeta/m1.cliquesMeta : null;
+    itens.push({ label:'CPC', bom: cpc!=null && cpc<0.15, valor: cpc!=null ? `R$ ${fmtR(cpc)}` : '—' });
+    itens.push({ label:'Cliques Shopee vs Meta', bom: m1.cliquesShopee >= m1.cliquesMeta, valor:`${m1.cliquesShopee} vs ${m1.cliquesMeta}` });
+    itens.push({ label:'Pedidos', bom: m1.pedidos>0, valor:`${m1.pedidos}` });
+    if (m1.impressoes >= 500) {
+      const ctr = m1.cliquesMeta/m1.impressoes;
+      itens.push({ label:'CTR', bom: ctr>0.015, valor:`${fmtR(ctr*100)}%` });
+    }
+    return itens;
+  }
+  if (dia >= 2 && dia <= 4) {
+    const roasAc = roasAcumuladoAte(dia);
+    itens.push({ label:'ROAS acumulado', bom: roasAc>=MGD_BREAKEVEN, valor:`${fmtR(roasAc)} (breakeven ${MGD_BREAKEVEN})` });
+    const md = m(dia);
+    const conv = md.cliquesMeta>0 ? md.pedidos/md.cliquesMeta : null;
+    if (conv != null) itens.push({ label:'Conversão', bom: conv>0.01, valor:`${fmtR(conv*100)}% · ${md.cliquesMeta} cliques` });
+    return itens;
+  }
+  if (dia >= 5) {
+    const roasAc = roasAcumuladoAte(dia);
+    itens.push({ label:'ROAS acumulado', bom: roasAc>=MGD_BREAKEVEN, valor:`${fmtR(roasAc)}` });
+    return itens;
+  }
+  return itens;
+}
+
+// ═══════════════════════════════════════════
+// ABA ANÁLISE MGD — lista de campanhas + detalhe com linha do tempo clicável
+// ═══════════════════════════════════════════
+let _mgdSelecionado = null;
+let _mgdDiaSelecionado = null;
+const _MGD_MAPA_BADGE = { VALIDADO:'b-camp', MANTER:'b-bom', 'ATENÇÃO':'b-med', AGUARDAR:'b-aguardar', DESATIVAR:'b-pess', PAUSAR:'b-fraco' };
+
+function renderAnaliseMGD() {
+  const listaEl = document.getElementById('mgd-lista-campanhas');
+  const detalheEl = document.getElementById('mgd-detalhe');
+  if (!listaEl || !detalheEl) return;
+
+  const sids = Object.entries(CFG_CAMPANHAS)
+    .filter(([sid, c]) => c && (c.effective_status||'').toUpperCase() === 'ACTIVE')
+    .map(([sid]) => sid)
+    .filter(sid => _primeiraDataGasto(sid) != null);
+
+  if (!sids.length) {
+    listaEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 4px;">Nenhuma campanha ativa com histórico de gasto ainda.</div>';
+    detalheEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">Assim que uma campanha ativa tiver gasto registrado, ela aparece aqui.</div>';
+    return;
+  }
+
+  if (!_mgdSelecionado || !sids.includes(_mgdSelecionado)) { _mgdSelecionado = sids[0]; _mgdDiaSelecionado = null; }
+
+  listaEl.innerHTML = sids.map(sid => {
+    const info = _analisarMGD(sid);
+    const ativo = sid === _mgdSelecionado;
+    const cls = _MGD_MAPA_BADGE[info.veredito] || 'b-aguardar';
+    return `<div onclick="_mgdSelecionarCampanha('${esc(sid)}')"
+      style="padding:8px 10px;margin-bottom:4px;border-radius:6px;cursor:pointer;${ativo?'background:var(--blue-bg);':''}">
+      <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(sid)}</div>
+      <div style="margin-top:4px;"><span class="badge ${cls}" style="font-size:10px;">${esc(info.fase)} · ${esc(info.veredito||'—')}</span></div>
+    </div>`;
+  }).join('');
+
+  _mgdRenderDetalhe();
+}
+
+function _mgdSelecionarCampanha(sid) {
+  _mgdSelecionado = sid;
+  _mgdDiaSelecionado = null;
+  renderAnaliseMGD();
+}
+
+function _mgdSelecionarDia(dia) {
+  _mgdDiaSelecionado = dia;
+  _mgdRenderDetalhe();
+}
+
+function _mgdRenderDetalhe() {
+  const el = document.getElementById('mgd-detalhe');
+  if (!el || !_mgdSelecionado) return;
+  const sid = _mgdSelecionado;
+  const infoAtual = _analisarMGD(sid);
+  if (infoAtual.dia == null) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Sem dados suficientes pra essa campanha ainda.</div>'; return; }
+
+  const diaView = _mgdDiaSelecionado != null ? _mgdDiaSelecionado : infoAtual.dia;
+  const info = diaView === infoAtual.dia ? infoAtual : _analisarMGD(sid, diaView);
+  const badgeCls = _MGD_MAPA_BADGE[info.veredito] || 'b-aguardar';
+  const metricas = _metricasDetalhadasDia(sid, diaView);
+  const roasAc = info.roasAcumulado != null ? info.roasAcumulado : 0;
+  const margem = roasAc - MGD_BREAKEVEN;
+
+  let timelineHtml = '';
+  for (let d = 0; d <= infoAtual.dia; d++) {
+    const infoD = d === infoAtual.dia ? infoAtual : _analisarMGD(sid, d);
+    const cls = _MGD_MAPA_BADGE[infoD.veredito] || 'b-aguardar';
+    const sel = d === diaView;
+    timelineHtml += `<div onclick="_mgdSelecionarDia(${d})" title="${esc(infoD.fase)}: ${esc(infoD.veredito||'—')}"
+      style="flex:1;min-width:28px;text-align:center;padding:6px 2px;border-radius:6px;cursor:pointer;${sel?'outline:2px solid #2563eb;':''}"
+      class="badge ${cls}"><span style="font-size:10px;font-weight:700;">D${d}</span></div>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;">${esc(sid)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Fase ${esc(info.fase)}</div>
+      </div>
+      <span class="badge ${badgeCls}" style="font-size:12px;padding:6px 14px;">${esc(info.veredito||'—')}</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">ROAS acumulado</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${roasAc.toFixed(2).replace('.',',')}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Breakeven</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${MGD_BREAKEVEN.toFixed(2).replace('.',',')}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Margem</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:${margem>=0?'var(--green)':'var(--red)'};">${margem>=0?'+':''}${margem.toFixed(2).replace('.',',')}</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Linha do tempo — clique num dia pra ver o detalhe</div>
+    <div style="display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;">${timelineHtml}</div>
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Métricas de ${esc(info.fase)}</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      ${metricas.length ? metricas.map((it,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;${i<metricas.length-1?'border-bottom:1px solid var(--border);':''}">
+          <span style="font-size:12px;">${it.bom?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--red)">✕</span>'} ${esc(it.label)}</span>
+          <span style="font-size:12px;color:var(--muted);">${esc(it.valor)}</span>
+        </div>`).join('') : '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">Sem métricas específicas pra esse dia.</div>'}
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Por que esse veredito</div>
+    <div style="font-size:13px;line-height:1.6;">${esc(info.motivo || '—')}</div>
+  `;
+}
+
 // Selo "D12" pra usar perto do nome da campanha (fase atual, baseada em hoje)
 function _badgeDiaCampanha(sid) {
   const _h = new Date();
@@ -9831,6 +10200,18 @@ function renderCampanhas() {
     rows.push(r);
   }
 
+  // Cruza a comissão Shopee por sub_id+data — a linha de gasto Meta sozinha
+  // nunca tem comissão (vem de uma tabela separada), então sem isso o ROAS de
+  // TODO dia com gasto dava 0, disparando o alerta de "3 dias negativos" à toa.
+  const diaComissaoMap = {};
+  for (const r of rowsBase) {
+    if (r.Plataforma !== 'shopee') continue;
+    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
+    const chave = (r.Sub_ID||'').toLowerCase() + '|' + r.Data;
+    if (!diaComissaoMap[chave]) diaComissaoMap[chave] = 0;
+    diaComissaoMap[chave] += Number(r.Comissao) || 0;
+  }
+
   // DEBUG
   console.log('renderCampanhas: DADOS='+DADOS.length+' rows_meta='+rows.length+' de='+de+' ate='+ate+' contaAtiva='+contaAtiva+' filtroStatus='+campFiltroStatus);
   // Agrega por sub_id: lista de dias com ROAS, status atual
@@ -9843,7 +10224,8 @@ function renderCampanhas() {
       Status: r._meta_status||'', dias:[]
     };
     if ((r._meta_status||'') && r._meta_status !== map[k].Status) map[k].Status = r._meta_status;
-    const d = derivar(r);
+    const comDoDia = diaComissaoMap[(r.Sub_ID||'').toLowerCase() + '|' + r.Data] || 0;
+    const d = derivar({ ...r, Comissao: comDoDia });
     map[k].dias.push({ data:r.Data, roas:d.ROAS_Liq||0, gasto:r.Gasto_Meta||0 });
   });
 
@@ -9965,7 +10347,12 @@ function renderCampanhas() {
     const vals=rdDatas.map(dt=>{ const d=(rdMap[sid]||{})[dt]||{gasto:0,com:0,imp:0}; return d.gasto>0?((d.com-d.imp)/d.gasto):null; });
     const comG=vals.filter(v=>v!==null);
     c._rdMedia = comG.length ? comG.reduce((s,v)=>s+v,0)/comG.length : 0;
-    const [lbl,cls]=classifROAS(c._rdMedia); c._rdLbl=lbl; c._rdCls=cls;
+    // Classificação vem do motor de veredito MGD (fase-aware — D0 a D10+), que
+    // substitui a régua fixa antiga de faixas de ROAS genéricas.
+    c._mgd = _analisarMGD(c.Sub_ID);
+    const _mapaClasseMGD = { VALIDADO:'b-camp', MANTER:'b-bom', 'ATENÇÃO':'b-med', AGUARDAR:'b-aguardar', DESATIVAR:'b-pess', PAUSAR:'b-fraco' };
+    c._rdLbl = c._mgd.classificacao || c._mgd.veredito || '—';
+    c._rdCls = _mapaClasseMGD[c._mgd.veredito] || 'b-aguardar';
   });
 
   // Filtros
@@ -10060,11 +10447,11 @@ function _campRenderCampanhasTabela() {
     <th style="text-align:center;min-width:50px">⚠️ Alerta</th>
     ${thS('Status','Status','border-left:2px solid var(--border);min-width:55px')}
     <th></th>
-    ${thS('Conta','Conta de<br>Anúncio','min-width:55px;white-space:normal')}
-    ${thS('orcamento','Orçamento','text-align:right;min-width:75px')}
     ${thS('totalDias','Dias')}
-    <th style="min-width:70px;text-align:left">Link</th>
+    ${thS('orcamento','Orçamento','text-align:right;min-width:75px')}
     <th style="min-width:140px;text-align:center">💰 Comissão</th>
+    <th style="min-width:70px;text-align:left">Link</th>
+    ${thS('Conta','Conta de<br>Anúncio','min-width:55px;white-space:normal')}
     ${thS('plataforma','Plataforma','min-width:65px')}
     ${thS('tipo','Tipo','text-align:center')}
     ${thS('mes','Mês','text-align:center;min-width:65px')}
@@ -10174,7 +10561,7 @@ function _campRenderCampanhasTabela() {
       </td>
       ${rdCells}
       <td style="text-align:center;border-left:2px solid var(--border)"><div style="${mediaSty}">${rdMedia>0?rdMedia.toFixed(2).replace('.',',')+'x':'—'}</div></td>
-      <td style="text-align:center"><span class="badge ${rdCls}">${rdLbl}</span></td>
+      <td style="text-align:center"><span class="badge ${rdCls}" title="${esc(c._mgd.fase)} — ${esc(c._mgd.motivo || '')}">${rdLbl}</span></td>
       <td style="text-align:center">
         ${temAlertaAuto ? `<span style="color:var(--red);font-size:11px;margin-right:3px" title="${esc(motivosAlertaAuto.join(' | '))}">⚠️</span>` : ''}
         <input type="checkbox" ${alertaManual?'checked':''}
@@ -10191,10 +10578,9 @@ function _campRenderCampanhasTabela() {
               style="padding:2px 6px;font-size:11px;border-radius:4px;border:1px solid var(--green);color:var(--green);background:transparent;cursor:pointer;">▶</button>`
         }
       </td>
-      <td style="font-size:10px;color:var(--muted);text-align:left;">${esc(c.Conta || (cfg.meta_account_id ? (CFG_META.find(m => 'act_' + m.id === cfg.meta_account_id)?.nome || '') : ''))}</td>
-      <td style="font-size:11px;text-align:right;white-space:nowrap">${orcFmt}</td>
       <td style="font-size:11px">${c.totalDias}</td>
-
+      <td style="font-size:11px;text-align:right;white-space:nowrap">${orcFmt}</td>
+      <td style="text-align:center;white-space:nowrap">${_campCelulaComissao(sid)}</td>
       <td style="white-space:nowrap">
         <div style="display:flex;align-items:center;gap:3px">
           ${cfg.link ? `<a href="${esc(cfg.link)}" target="_blank" rel="noopener"
@@ -10206,7 +10592,7 @@ function _campRenderCampanhasTabela() {
             onchange="event.stopPropagation();_campSet('${sid}','link',this.value);renderCampanhas()">
         </div>
       </td>
-      <td style="text-align:center;white-space:nowrap">${_campCelulaComissao(sid)}</td>
+      <td style="font-size:10px;color:var(--muted);text-align:left;">${esc(c.Conta || (cfg.meta_account_id ? (CFG_META.find(m => 'act_' + m.id === cfg.meta_account_id)?.nome || '') : ''))}</td>
       <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:75px;"
           onchange="event.stopPropagation();_campSetPlat('${sid}',this.value)">${selPlat}</select>
         <button onclick="event.stopPropagation();abrirHistPlat('${sid}')"

@@ -80,15 +80,30 @@ async function shopeeQuery(appId, secret, query) {
   return data;
 }
 
-// ── Busca a comissão de UM produto (não a média da loja) ─────────────
+// ── Busca a comissão + preço de UM produto (não a média da loja) ─────
 // Produto indisponível/removido não dá erro — só volta nodes: [] vazio.
+// Tenta trazer o preço junto (pra calcular o valor da comissão em R$); se a
+// API não aceitar esses campos extras, cai pra query mínima (só comissão) —
+// nunca deixa a verificação inteira falhar por causa de um campo cosmético.
 async function buscarComissaoProduto(appId, secret, shopId, itemId) {
-  const query = `{ productOfferV2(shopId: ${shopId}, itemId: ${itemId}) { nodes { commissionRate } } }`;
-  const data  = await shopeeQuery(appId, secret, query);
+  const queryCompleta = `{ productOfferV2(shopId: ${shopId}, itemId: ${itemId}) { nodes { commissionRate price priceMin } } }`;
+  let data, usouFallback = false;
+  try {
+    data = await shopeeQuery(appId, secret, queryCompleta);
+  } catch (e) {
+    usouFallback = true;
+    const queryMinima = `{ productOfferV2(shopId: ${shopId}, itemId: ${itemId}) { nodes { commissionRate } } }`;
+    data = await shopeeQuery(appId, secret, queryMinima);
+  }
   const nodes = data?.data?.productOfferV2?.nodes || [];
-  if (!nodes.length) return { indisponivel: true, comissao: 0 };
+  if (!nodes.length) return { indisponivel: true, comissao: 0, preco: null };
   const rate = parseFloat(nodes[0].commissionRate || 0);
-  return { indisponivel: false, comissao: rate * 100 }; // vira percentual (ex: 0.10 -> 10)
+  const precoRaw = usouFallback ? null : (nodes[0].price ?? nodes[0].priceMin ?? null);
+  return {
+    indisponivel: false,
+    comissao: rate * 100, // vira percentual (ex: 0.10 -> 10)
+    preco: precoRaw != null ? parseFloat(precoRaw) : null,
+  };
 }
 
 // ── Busca dados extras do produto pro corpo do e-mail de alerta ──────
@@ -146,8 +161,9 @@ async function verificarComissoes() {
 
   for (const { shopId, itemId, sids } of porProduto.values()) {
     try {
-      const { indisponivel, comissao } = await buscarComissaoProduto(contaApi.appId, contaApi.secret, shopId, itemId);
+      const { indisponivel, comissao, preco } = await buscarComissaoProduto(contaApi.appId, contaApi.secret, shopId, itemId);
       const comissaoFinal = indisponivel ? 0 : comissao;
+      const comissaoValorFinal = (!indisponivel && preco != null) ? Math.round(preco * (comissaoFinal / 100) * 100) / 100 : null;
 
       const existRes  = await fetch(
         `${base()}/shopee_comissao_cache?shop_id=eq.${shopId}&item_id=eq.${itemId}&select=comissao_atual,alerta_ativo,confirmado`,
@@ -172,6 +188,8 @@ async function verificarComissoes() {
         sub_ids:           sids,
         comissao_atual:    comissaoFinal,
         comissao_anterior: comissaoAnteriorNum,
+        preco:             indisponivel ? null : preco,
+        comissao_valor:    comissaoValorFinal,
         indisponivel,
         alerta_ativo:      alertaAtivo,
         confirmado,

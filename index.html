@@ -606,6 +606,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <thead>
           <tr>
             <th style="text-align:center;width:30px;"><input type="checkbox" id="pedidos-check-all" onchange="pedidosToggleTodos(this)"></th>
+            <th style="text-align:left;width:80px;cursor:pointer;" onclick="setPedidosSort('Data')">Data <span id="pedidos-sort-Data"></span></th>
             <th style="text-align:left;width:110px;cursor:pointer;" onclick="setPedidosSort('Order_ID')">ID Pedido <span id="pedidos-sort-Order_ID"></span></th>
             <th style="text-align:left;cursor:pointer;" onclick="setPedidosSort('Nome_Item')">Item <span id="pedidos-sort-Nome_Item"></span></th>
             <th style="text-align:center;width:50px;">Link</th>
@@ -617,7 +618,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
           </tr>
         </thead>
         <tbody id="pedidos-body">
-          <tr><td colspan="9" class="empty">Carregando...</td></tr>
+          <tr><td colspan="10" class="empty">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -9308,6 +9309,7 @@ async function renderPedidos() {
     }));
     return `<tr>
       <td style="text-align:center;"><input type="checkbox" class="pedidos-check-row" data-pid="${esc(pidKey)}" ${marcado} onchange="pedidosToggleSelecao(this)"></td>
+      <td style="text-align:left;font-size:11px;color:var(--muted);white-space:nowrap;">${fmtDataBR(r.Data)}</td>
       <td style="text-align:left;font-size:10px;color:var(--muted);">${esc(r.Order_ID||'—')}</td>
       <td style="text-align:left;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px;">${nomeItemTxt}</td>
       <td style="text-align:center;font-size:11px;">${linkDisplay}</td>
@@ -9328,7 +9330,7 @@ async function renderPedidos() {
     </tr>`;
   }).join('');
 
-  document.getElementById('pedidos-body').innerHTML = html || '<tr><td colspan="9" class="empty">Nenhum pedido nesta data</td></tr>';
+  document.getElementById('pedidos-body').innerHTML = html || '<tr><td colspan="10" class="empty">Nenhum pedido nesta data</td></tr>';
   _pedidosAtualizarBarraSelecao();
 }
 

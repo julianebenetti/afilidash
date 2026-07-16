@@ -80,7 +80,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 /* ── TABLE SECTION ── */
 .section { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; margin-bottom:20px; }
 .section-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-radius:var(--r) var(--r) 0 0; }
-.section-title { font-size:14px; font-weight:600; flex:1; }
+.section-title { font-size:13px; font-weight:700; letter-spacing:.2px; display:inline-block; background:#2d2b27; color:#f0efec; padding:5px 12px; border-radius:6px; margin-bottom:3px; }
 .section-sub { font-size:11px; color:var(--muted); }
 .controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; flex:1; min-width:0; }
 .filter-btn { padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:20px; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); }
@@ -139,6 +139,14 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 .b-fraco { background:#ffedd5; color:#9a3412; }
 .b-pess  { background:var(--red-bg); color:var(--red); }
 .b-aguardar { background:var(--bg3); color:var(--muted); }
+
+/* ── Título de seção com fundo escuro (Análise MGD) — separa visualmente
+   títulos/resumos do conteúdo normal, que hoje fica tudo muito parecido ── */
+.mgd-titulo-secao {
+  font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase;
+  color:#f0efec; background:#2d2b27;
+  padding:6px 10px; border-radius:6px; margin-bottom:8px; display:inline-block;
+}
 
 /* ── DETAIL ── */
 .detail-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
@@ -208,7 +216,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 .cfg-aba-move:hover { color:var(--text); border-color:#2563eb; }
 .cfg-aba-fixed { font-size:10px; color:#2563eb; font-weight:600; padding:2px 6px; border-radius:999px; background:var(--blue-bg); }
 .cfg-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:18px 20px; margin-bottom:14px; }
-.cfg-card-title { font-size:13px; font-weight:600; margin-bottom:14px; }
+.cfg-card-title { font-size:12px; font-weight:700; letter-spacing:.2px; display:inline-block; background:#2d2b27; color:#f0efec; padding:5px 12px; border-radius:6px; margin-bottom:14px; }
 .cfg-row2 { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
 .cfg-field { display:flex; flex-direction:column; gap:5px; }
 .cfg-field label { font-size:12px; color:var(--muted); font-weight:500; }
@@ -658,7 +666,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       <button class="period-btn"        id="camp-p-max" onclick="setCampPeriodo('max',this)" title="Todo o histórico já carregado">Máximo</button>
     </div>
     <div class="toolbar-right">
-      <button class="act-btn" id="btn-atualizar-meta-status" onclick="atualizarMetaStatusOrcamento()" title="Atualiza status, orçamento e detecta campanhas novas de todas as contas Meta — sem buscar histórico de gasto (rápido)">🔄 Atualizar Meta Ads</button>
+      <button class="act-btn" id="btn-atualizar-meta-status" onclick="atualizarMetaStatusOrcamento()" title="Atualiza tudo: status, orçamento, link do criativo, comissão E o gasto real da Meta/pedidos da Shopee — mesma coisa que o '⚡ Atualizar API' do Dashboard">🔄 Atualizar Meta Ads</button>
     </div>
   </div>
   <div class="section">
@@ -1229,7 +1237,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
     <!-- ── MGD ── -->
     <div class="cfg-panel" id="cfgpanel-mgd">
       <div class="cfg-card">
-        <div class="cfg-card-title">Classificação de campanha <span style="font-size:11px;font-weight:400;color:var(--muted);">— baseada no ROAS Líquido</span></div>
+        <div class="cfg-card-title">Classificação de campanha <span style="font-size:11px;font-weight:400;color:#c9c6be;">— baseada no ROAS Líquido</span></div>
         <div class="cfg-row2">
           <div class="cfg-field">
             <label><span class="badge b-pess">Péssimo</span> — abaixo de</label>
@@ -1259,7 +1267,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-card-title">Classificação de Evasão de grupo <span style="font-size:11px;font-weight:400;color:var(--muted);">— vale pra Evasão Dia e Evasão Total</span></div>
+        <div class="cfg-card-title">Classificação de Evasão de grupo <span style="font-size:11px;font-weight:400;color:#c9c6be;">— vale pra Evasão Dia e Evasão Total</span></div>
         <div class="cfg-row2">
           <div class="cfg-field">
             <label><span class="badge b-bom">Verde</span> — até (%)</label>
@@ -1277,7 +1285,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       </div>
 
       <div class="cfg-card">
-        <div class="cfg-card-title">Classificação de Custo por Lead <span style="font-size:11px;font-weight:400;color:var(--muted);">— campanhas vinculadas, aba Grupos</span></div>
+        <div class="cfg-card-title">Classificação de Custo por Lead <span style="font-size:11px;font-weight:400;color:#c9c6be;">— campanhas vinculadas, aba Grupos</span></div>
         <div class="cfg-row2">
           <div class="cfg-field">
             <label><span class="badge" style="background:#bbf7d0;color:#166534;">Verde escuro</span> — até (R$)</label>
@@ -1303,7 +1311,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
     <!-- ── MOTIVOS DE PAUSA ── -->
     <div class="cfg-panel" id="cfgpanel-motivospausa">
       <div class="cfg-card">
-        <div class="cfg-card-title">Motivos de pausa <span style="font-size:11px;font-weight:400;color:var(--muted);">— usados no modal de pausar campanha e na coluna "Motivo Pausa" da aba Campanhas</span></div>
+        <div class="cfg-card-title">Motivos de pausa <span style="font-size:11px;font-weight:400;color:#c9c6be;">— usados no modal de pausar campanha e na coluna "Motivo Pausa" da aba Campanhas</span></div>
         <div class="cfg-hint" style="margin-top:4px;">"Destacar em vermelho" controla se esse motivo aparece com destaque na coluna da tabela. Arraste pelo ⠿ pra reordenar (é a ordem que aparece nos botões do modal de pausar).</div>
         <div id="motivos-pausa-list" style="margin-top:10px;"></div>
         <button class="add-btn" onclick="adicionarMotivoPausa()" style="margin-top:8px;">+ Adicionar motivo</button>
@@ -1313,17 +1321,17 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
     <!-- ── CLASSIFICAÇÃO DE CRIATIVO ── -->
     <div class="cfg-panel" id="cfgpanel-classcriativo">
       <div class="cfg-card">
-        <div class="cfg-card-title">Produto <span style="font-size:11px;font-weight:400;color:var(--muted);">— qual produto cada campanha promove</span></div>
+        <div class="cfg-card-title">Produto <span style="font-size:11px;font-weight:400;color:#c9c6be;">— qual produto cada campanha promove</span></div>
         <div id="class-produto-list" style="margin-top:10px;"></div>
         <button class="add-btn" onclick="adicionarClassCriativo('produto')" style="margin-top:8px;">+ Adicionar produto</button>
       </div>
       <div class="cfg-card" style="margin-top:16px;">
-        <div class="cfg-card-title">Gancho <span style="font-size:11px;font-weight:400;color:var(--muted);">— tipo de abertura do criativo (dor, curiosidade, prova social...)</span></div>
+        <div class="cfg-card-title">Gancho <span style="font-size:11px;font-weight:400;color:#c9c6be;">— tipo de abertura do criativo (dor, curiosidade, prova social...)</span></div>
         <div id="class-gancho-list" style="margin-top:10px;"></div>
         <button class="add-btn" onclick="adicionarClassCriativo('gancho')" style="margin-top:8px;">+ Adicionar gancho</button>
       </div>
       <div class="cfg-card" style="margin-top:16px;">
-        <div class="cfg-card-title">Formato <span style="font-size:11px;font-weight:400;color:var(--muted);">— estilo do criativo (UGC, POV, mãos mostrando produto...)</span></div>
+        <div class="cfg-card-title">Formato <span style="font-size:11px;font-weight:400;color:#c9c6be;">— estilo do criativo (UGC, POV, mãos mostrando produto...)</span></div>
         <div id="class-formato-list" style="margin-top:10px;"></div>
         <button class="add-btn" onclick="adicionarClassCriativo('formato')" style="margin-top:8px;">+ Adicionar formato</button>
       </div>
@@ -2559,7 +2567,7 @@ function _abrirAjuda(pagina) {
           <li>Campanhas sem nenhum dado ainda (recém-criadas) podem ser pausadas/ativadas mesmo sem terem rodado no Meta ainda — fica salvo localmente até sincronizar.</li>
           <li>A navbar <strong>não filtra por data</strong> — filtra por <strong>plataforma</strong>, verificando a vigência de cada campanha (uma campanha só aparece sob um filtro se ela realmente tiver sido daquela plataforma naquele período).</li>
           <li>O botão <strong>▶/⏸</strong> pausa/ativa a campanha direto no Meta — campanhas com 1 anúncio agem na campanha; campanhas com 2+ anúncios agem no anúncio específico daquela linha.</li>
-          <li><strong>"Atualizar Meta Ads"</strong> só atualiza status/orçamento (rápido). Pra trazer gasto/clique de verdade, use o <strong>"⚡ Atualizar API"</strong> no Dashboard.</li>
+          <li><strong>"Atualizar Meta Ads"</strong> (aba Campanhas) e <strong>"⚡ Atualizar API"</strong> (Dashboard) agora fazem a mesma atualização completa — não importa qual dos dois você clique, tudo é atualizado.</li>
         </ul>`
     },
     whats: {
@@ -5671,6 +5679,11 @@ async function atualizarMetaStatusOrcamento() {
       toast(`✓ ${totalCampanhas} campanhas verificadas${totalNovas ? ', ' + totalNovas + ' nova(s)' : ''}`, 'ok');
     }
     _verificarComissoesAposSync(); // roda em segundo plano — não trava o botão nem o toast acima
+    // Historicamente existiam 2 botões fazendo coisas diferentes (esse só status/
+    // orçamento, o "⚡ Atualizar API" do Dashboard buscava o gasto de verdade) —
+    // isso confundia e arriscava a pessoa ver dado incompleto sem perceber. Agora
+    // clicar em QUALQUER um dos dois sempre atualiza tudo.
+    if (typeof syncAPI === 'function') void syncAPI();
   } finally {
     if (btn) { btn.textContent = '🔄 Atualizar Meta Ads'; btn.disabled = false; }
   }
@@ -6114,6 +6127,9 @@ async function syncAPI() {
 
   toast(resumo, temErro ? 'warn' : 'ok');
   if (btn) { btn.textContent = '⚡ Atualizar API'; btn.disabled = false; }
+  // Mesma lógica do botão "Atualizar Meta Ads": não importa qual botão foi
+  // clicado, os dois agora disparam a checagem de comissão em segundo plano.
+  if (typeof _verificarComissoesAposSync === 'function') void _verificarComissoesAposSync();
 }
 
 // Teste real de conexão Shopee
@@ -9256,17 +9272,21 @@ function _analisarMGD(sid, diaForcado) {
     return { dia:diaAtual, fase:'D'+diaAtual, veredito: classe ? 'MANTER' : 'ATENÇÃO', motivo: classe ? `Classificado como ${classe} (ROAS ${fmtR(roasAc)})` : `ROAS ${fmtR(roasAc)} — ainda abaixo de Mediano (${MGD_FAIXA_MEDIANO})`, classificacao: classe, roasAcumulado: roasAc };
   }
 
-  // ── D10+ — julga pela janela dos últimos 7 dias, nunca por 1 dia isolado ──
+  // ── D10+ — veredito julga pela janela dos últimos 7 dias (nunca por 1 dia
+  // isolado, regra do framework), MAS a classificação (Mediano/Bom/Campeão)
+  // usa o ROAS acumulado desde o D0 — senão uma campanha ótima há meses podia
+  // "perder" o título de Campeão só por causa de uma semana ruim pontual.
   let gasto7=0, com7=0, imp7=0;
   for (let n = diaAtual-6; n <= diaAtual; n++) { const mm = m(n); gasto7+=mm.gastoMeta; com7+=mm.comissao; imp7+=mm.imposto; }
   const roas7 = gasto7 > 0 ? (com7 - imp7) / gasto7 : 0;
-  const classe7 = classificar(roas7);
+  const roasVida = roasAcumuladoAte(diaAtual);
+  const classeVida = classificar(roasVida);
   return {
     dia: diaAtual, fase: 'D'+diaAtual+'+',
     veredito: roas7 >= MGD_BREAKEVEN ? 'MANTER' : 'ATENÇÃO',
-    motivo: `Janela de 7 dias: ROAS médio ${fmtR(roas7)}${classe7 ? ' ('+classe7+')' : ''}`,
-    classificacao: classe7,
-    roasAcumulado: roas7,
+    motivo: `Janela de 7 dias: ROAS médio ${fmtR(roas7)} · ROAS acumulado desde o lançamento: ${fmtR(roasVida)}${classeVida ? ' ('+classeVida+')' : ''}`,
+    classificacao: classeVida,
+    roasAcumulado: roasVida,
   };
 }
 
@@ -9666,7 +9686,7 @@ function renderInsightsOperacao() {
   };
 
   el.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Insights automáticos</div>
+    <div class="mgd-titulo-secao">Insights automáticos</div>
     ${secaoCategoria('Produto', '📦', m.porProduto)}
     ${secaoCategoria('Gancho', '🎣', m.porGancho)}
     ${secaoCategoria('Formato', '🎬', m.porFormato)}
@@ -9769,7 +9789,7 @@ function renderTaxaValidacao() {
     const chaves = Object.keys(mapa).sort((a,b) => mapa[b].testados - mapa[a].testados);
     if (!chaves.length) return `<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">${titulo}: nenhuma campanha classificada ainda.</div>`;
     return `
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${titulo}</div>
+      <div class="mgd-titulo-secao">${titulo}</div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
         ${chaves.map((k,i) => {
           const d = mapa[k];
@@ -9785,7 +9805,7 @@ function renderTaxaValidacao() {
   const mesesOrdenados = Object.keys(m.porMes).sort();
   const fmtMes = mk => { const [ano,mes] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(mes,10)-1]||mes) + '/' + ano.slice(2); };
   const tabelaMensal = mesesOrdenados.length ? `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Comparativo entre meses (agrupado pelo mês de lançamento de cada campanha)</div>
+    <div class="mgd-titulo-secao">Comparativo entre meses (agrupado pelo mês de lançamento de cada campanha)</div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
         <thead>
@@ -9820,7 +9840,7 @@ function renderTaxaValidacao() {
     </div>` : '';
 
   const topHtml = m.topCampeoes.length ? `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Top campeões — ordenado por ROAS médio</div>
+    <div class="mgd-titulo-secao">Top campeões — ordenado por ROAS médio</div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
         <thead>
@@ -9880,6 +9900,42 @@ function renderTaxaValidacao() {
 }
 
 let _mgdBibliotecaCache = null; // cache da biblioteca completa, filtrada na hora da busca
+let _mgdTestadosExpandido = false; // linha "Testados" do funil expandida?
+let _mgdMesExpandidoFunil = null;  // qual mês está expandido dentro de "Testados"
+
+// Agrupa os criativos testados por mês de lançamento e, dentro de cada mês,
+// por dia — com o detalhe de cada campanha daquele dia (nome, quanto tempo
+// rodou, se validou). Alimenta o drill-down da linha "Testados" no funil.
+function _mgdTestadosPorMesEDia() {
+  const sids = Object.keys(CFG_CAMPANHAS).filter(sid => _primeiraDataGasto(sid) != null);
+  const porMes = {};
+  sids.forEach(sid => {
+    const d0 = _primeiraDataGasto(sid);
+    const mesKey = d0.slice(0, 7);
+    if (!porMes[mesKey]) porMes[mesKey] = { total: 0, porDia: {} };
+    porMes[mesKey].total++;
+    if (!porMes[mesKey].porDia[d0]) porMes[mesKey].porDia[d0] = [];
+    const info = _analisarMGD(sid);
+    const validou = _primeiroDiaValidacao(sid) != null;
+    porMes[mesKey].porDia[d0].push({
+      sid,
+      fase: info.fase,
+      tempoRodou: info.dia,
+      validou,
+      status: info.veredito,
+    });
+  });
+  return porMes;
+}
+
+function _mgdToggleTestadosExpand() {
+  _mgdTestadosExpandido = !_mgdTestadosExpandido;
+  renderFunilOperacao();
+}
+function _mgdToggleMesExpand(mesKey) {
+  _mgdMesExpandidoFunil = _mgdMesExpandidoFunil === mesKey ? null : mesKey;
+  renderFunilOperacao();
+}
 
 function toggleFunilOperacao() {
   const el = document.getElementById('mgd-operacao');
@@ -9901,34 +9957,62 @@ function renderFunilOperacao() {
   _mgdBibliotecaCache = m.biblioteca;
 
   const etapas = [
-    ['Testados',    m.funil.testados,    100],
     ['Validados',   m.funil.validados,   m.funil.testados>0 ? m.funil.validados/m.funil.testados*100 : 0],
     ['Pré-Escala',  m.funil.preEscala,   m.funil.validados>0 ? m.funil.preEscala/m.funil.validados*100 : 0],
     ['Escala',      m.funil.escala,      m.funil.preEscala>0 ? m.funil.escala/m.funil.preEscala*100 : 0],
     ['Campeões',    m.funil.campeoes,    m.funil.escala>0 ? m.funil.campeoes/m.funil.escala*100 : 0],
   ];
+
+  const testadosPorMesEDia = _mgdTestadosPorMesEDia();
+  const mesesOrdenados = Object.keys(testadosPorMesEDia).sort().reverse();
+  const fmtMesFunil = mk => { const [ano,mes] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(mes,10)-1]||mes) + '/' + ano.slice(2); };
+
+  const testadosDetalheHtml = _mgdTestadosExpandido ? `
+    <div style="padding:8px 12px 12px 34px;border-bottom:1px solid var(--border);background:var(--bg);">
+      ${mesesOrdenados.map(mk => {
+        const dados = testadosPorMesEDia[mk];
+        const expandido = _mgdMesExpandidoFunil === mk;
+        const diasOrdenados = Object.keys(dados.porDia).sort().reverse();
+        return `<div style="margin-bottom:6px;">
+          <div onclick="event.stopPropagation();_mgdToggleMesExpand('${mk}')"
+            style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:pointer;background:var(--bg2);border-radius:6px;border:1px solid var(--border);">
+            <span style="font-size:12px;">${expandido?'▼':'▶'} ${esc(fmtMesFunil(mk))}</span>
+            <span style="font-size:12px;color:var(--muted);">${dados.total} teste(s)</span>
+          </div>
+          ${expandido ? diasOrdenados.map(dia => `
+            <div style="margin:6px 0 6px 18px;">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">${fmtDataBR(dia)}</div>
+              ${dados.porDia[dia].map(c => `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:6px;margin-bottom:4px;flex-wrap:wrap;">
+                  <span style="font-size:12px;font-weight:500;">${esc(c.sid)}</span>
+                  <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${esc(c.fase)} · ${c.tempoRodou} dia(s) rodando · ${c.validou ? '✅ validou' : (c.status==='DESATIVAR'||c.status==='PAUSAR' ? '🔴 '+esc(c.status) : '⏳ ainda testando')}</span>
+                </div>`).join('')}
+            </div>`).join('') : ''}
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   const funilHtml = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Funil da operação</div>
+    <div class="mgd-titulo-secao">Funil da operação</div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      <div onclick="_mgdToggleTestadosExpand()" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;">
+        <span style="font-size:10px;width:10px;">${_mgdTestadosExpandido?'▼':'▶'}</span>
+        <span style="font-size:12px;width:80px;flex-shrink:0;">Testados</span>
+        <div style="flex:1;background:var(--bg3);border-radius:4px;height:16px;overflow:hidden;">
+          <div style="width:100%;height:100%;background:#3b82f6;"></div>
+        </div>
+        <span style="font-size:12px;color:var(--muted);width:110px;text-align:right;flex-shrink:0;">${m.funil.testados} (100,0%)</span>
+      </div>
+      ${testadosDetalheHtml}
       ${etapas.map(([label,n,pct],i) => `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;${i<etapas.length-1?'border-bottom:1px solid var(--border);':''}">
-          <span style="font-size:12px;width:90px;flex-shrink:0;">${esc(label)}</span>
+          <span style="font-size:12px;width:80px;flex-shrink:0;padding-left:20px;">${esc(label)}</span>
           <div style="flex:1;background:var(--bg3);border-radius:4px;height:16px;overflow:hidden;">
             <div style="width:${Math.min(100,pct)}%;height:100%;background:#3b82f6;"></div>
           </div>
           <span style="font-size:12px;color:var(--muted);width:110px;text-align:right;flex-shrink:0;">${n} (${fmtPct(pct)})</span>
         </div>`).join('')}
     </div>`;
-
-  const semanasOrdenadas = Object.keys(m.porSemana).sort();
-  const semanasHtml = semanasOrdenadas.length ? `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Testes por semana (segunda-feira de início)</div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
-      ${semanasOrdenadas.map((sk,i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;${i<semanasOrdenadas.length-1?'border-bottom:1px solid var(--border);':''}">
-        <span style="font-size:12px;">${fmtDataBR(sk)}</span>
-        <span style="font-size:12px;color:var(--muted);">${m.porSemana[sk]} teste(s)</span>
-      </div>`).join('')}
-    </div>` : '';
 
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
@@ -9950,8 +10034,7 @@ function renderFunilOperacao() {
       </div>
     </div>
     ${funilHtml}
-    ${semanasHtml}
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Biblioteca de Campeões</div>
+    <div class="mgd-titulo-secao">Biblioteca de Campeões</div>
     <input type="text" placeholder="Buscar por produto, gancho, formato ou campanha..." oninput="_mgdFiltrarBiblioteca(this.value)"
       style="width:100%;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-family:var(--font);background:var(--bg2);color:var(--text);margin-bottom:10px;outline:none;">
     <div id="mgd-biblioteca-lista"></div>
@@ -10131,16 +10214,16 @@ function _mgdRenderDetalhe() {
     </div>
 
     ${alertas.length ? `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Alertas</div>
+    <div class="mgd-titulo-secao">Alertas</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
       ${alertas.map(a => `<div style="font-size:12px;background:var(--bg2);border-radius:6px;padding:7px 10px;">${esc(a)}</div>`).join('')}
     </div>` : ''}
 
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Linha do tempo — clique num dia pra ver o detalhe</div>
+    <div class="mgd-titulo-secao">Linha do tempo — clique num dia pra ver o detalhe</div>
     ${navTimeline}
     <div style="display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;">${timelineHtml}</div>
 
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Métricas de ${esc(info.fase)}</div>
+    <div class="mgd-titulo-secao">Métricas de ${esc(info.fase)}</div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
       ${metricas.length ? metricas.map((it,i) => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;${i<metricas.length-1?'border-bottom:1px solid var(--border);':''}">
@@ -10149,7 +10232,7 @@ function _mgdRenderDetalhe() {
         </div>`).join('') : '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">Sem métricas específicas pra esse dia.</div>'}
     </div>
 
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Por que esse veredito</div>
+    <div class="mgd-titulo-secao">Por que esse veredito</div>
     <div style="font-size:13px;line-height:1.6;">${esc(info.motivo || '—')}</div>
   `;
 }

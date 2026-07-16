@@ -9047,14 +9047,38 @@ function _marcarDADOSAlterados() {
 // ═══════════════════════════════════════════
 let _primeiraDataGastoCache = {}; // sid (lowercase) -> 'YYYY-MM-DD' | null
 
+// ═══════════════════════════════════════════
+// ÍNDICE DADOS POR SUB_ID — construído 1x por versão dos dados (não a cada
+// chamada), reaproveitado por todas as funções do motor MGD abaixo. Sem
+// isso, cada uma varria o array DADOS inteiro (pode ter dezenas de milhares
+// de linhas) pra CADA campanha — com centenas de campanhas, isso multiplicava
+// rápido e deixava a aba Análise MGD lenta pra carregar.
+// ═══════════════════════════════════════════
+let _mgdIndiceDadosVersao = -1;
+let _mgdIndiceDadosPorSid = null; // Map: sid (lowercase) -> array de rows
+function _mgdIndiceDados() {
+  if (_mgdIndiceDadosPorSid && _mgdIndiceDadosVersao === _dadosVersao) return _mgdIndiceDadosPorSid;
+  const idx = new Map();
+  for (const r of DADOS) {
+    const key = (r.Sub_ID || '').toLowerCase();
+    if (!key) continue;
+    let arr = idx.get(key);
+    if (!arr) { arr = []; idx.set(key, arr); }
+    arr.push(r);
+  }
+  _mgdIndiceDadosPorSid = idx;
+  _mgdIndiceDadosVersao = _dadosVersao;
+  return idx;
+}
+
 function _primeiraDataGasto(sid) {
   const key = (sid || '').toLowerCase();
   if (!key) return null;
   if (key in _primeiraDataGastoCache) return _primeiraDataGastoCache[key];
   let min = null;
-  for (const r of DADOS) {
+  const rows = _mgdIndiceDados().get(key) || [];
+  for (const r of rows) {
     if (r.Plataforma !== 'meta') continue;
-    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
     if (!(Number(r.Gasto_Meta) > 0)) continue;
     const d = normData(r.Data);
     if (d && (!min || d < min)) min = d;
@@ -9079,11 +9103,10 @@ function _rotuloDiaCampanha(sid, dataStr) {
 function _cpcD0Campanha(sid) {
   const d0 = _primeiraDataGasto(sid);
   if (!d0) return null;
-  const key = (sid || '').toLowerCase();
   let gasto = 0, cliques = 0;
-  for (const r of DADOS) {
+  const rows = _mgdIndiceDados().get((sid || '').toLowerCase()) || [];
+  for (const r of rows) {
     if (r.Plataforma !== 'meta') continue;
-    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
     if (normData(r.Data) !== d0) continue;
     gasto   += Number(r.Gasto_Meta)    || 0;
     cliques += Number(r.Cliques_Meta)  || 0;
@@ -9117,14 +9140,19 @@ function _mgdDiaEntradaEscala(sid) {
 
 // Histórico diário completo de uma campanha, cruzando Meta (gasto/cliques/
 // impressões) e Shopee (comissão/imposto/pedidos/cliques) por data. Base de
-// tudo que o motor de veredito usa — sem isso, cada regra teria que escanear
-// DADOS de novo.
+// tudo que o motor de veredito usa. Guarda em cache por sid+versão dos dados,
+// porque é chamada várias vezes pra mesma campanha em funções diferentes
+// (analisarMGD, primeiroDiaValidacao, roasAcumuladoTotal, etc.) — sem cache,
+// reprocessava tudo de novo a cada uma dessas chamadas.
+let _historicoDiarioCache = new Map(); // sid -> { versao, dados }
 function _historicoDiarioCampanha(sid) {
   const key = (sid || '').toLowerCase();
+  const cacheado = _historicoDiarioCache.get(key);
+  if (cacheado && cacheado.versao === _dadosVersao) return cacheado.dados;
   const porDia = {};
   const get = dt => { if (!porDia[dt]) porDia[dt] = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0, venda:0 }; return porDia[dt]; };
-  for (const r of DADOS) {
-    if ((r.Sub_ID || '').toLowerCase() !== key) continue;
+  const rows = _mgdIndiceDados().get(key) || [];
+  for (const r of rows) {
     const dt = normData(r.Data);
     if (!dt) continue;
     if (r.Plataforma === 'meta') {
@@ -9145,6 +9173,7 @@ function _historicoDiarioCampanha(sid) {
       }
     }
   }
+  _historicoDiarioCache.set(key, { versao: _dadosVersao, dados: porDia });
   return porDia;
 }
 

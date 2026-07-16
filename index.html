@@ -691,6 +691,15 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
      PÁGINA: ANÁLISE MGD (veredito por campanha, D0 ao D10+)
 ══════════════════════════════════════════ -->
 <div class="page" id="page-analise-mgd">
+  <div id="mgd-cards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;"></div>
+  <div style="margin-bottom:16px;">
+    <button id="btn-taxa-validacao" onclick="toggleTaxaValidacao()"
+      style="font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);cursor:pointer;">📊 Ver taxa de validação</button>
+    <button id="btn-funil-operacao" onclick="toggleFunilOperacao()"
+      style="font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);cursor:pointer;margin-left:8px;">📈 Ver funil e biblioteca de campeões</button>
+    <div id="mgd-validacao" style="display:none;margin-top:12px;"></div>
+    <div id="mgd-operacao" style="display:none;margin-top:12px;"></div>
+  </div>
   <div style="display:flex;gap:16px;align-items:flex-start;">
     <div style="width:230px;flex-shrink:0;background:var(--bg2);border-radius:10px;padding:10px;max-height:calc(100vh - 160px);overflow-y:auto;">
       <div style="font-size:12px;color:var(--muted);margin:0 0 8px;padding:0 4px;">Campanhas ativas</div>
@@ -1161,6 +1170,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <button class="cfg-tab" onclick="setCfgTab('abas',this);renderCfgAbas()">Abas</button>
         <button class="cfg-tab" onclick="setCfgTab('mgd',this)">Classificação</button>
         <button class="cfg-tab" onclick="setCfgTab('motivospausa',this);renderMotivosPausa();">Motivos de Pausa</button>
+        <button class="cfg-tab" onclick="setCfgTab('classcriativo',this);renderClassCriativo('produto');renderClassCriativo('gancho');renderClassCriativo('formato');">Classificação de Criativo</button>
         <button class="cfg-tab" onclick="setCfgTab('datas',this);renderDatas();">Datas Especiais</button>
         <button class="cfg-tab" onclick="setCfgTab('operacoes',this);renderOperacoes();">Operações</button>
         <button class="cfg-tab" onclick="setCfgTab('atualizacao',this);renderBackupExclusao();">Backup/Exclusão</button>
@@ -1288,6 +1298,26 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <div id="motivos-pausa-list" style="margin-top:10px;"></div>
         <button class="add-btn" onclick="adicionarMotivoPausa()" style="margin-top:8px;">+ Adicionar motivo</button>
       </div>
+    </div>
+
+    <!-- ── CLASSIFICAÇÃO DE CRIATIVO ── -->
+    <div class="cfg-panel" id="cfgpanel-classcriativo">
+      <div class="cfg-card">
+        <div class="cfg-card-title">Produto <span style="font-size:11px;font-weight:400;color:var(--muted);">— qual produto cada campanha promove</span></div>
+        <div id="class-produto-list" style="margin-top:10px;"></div>
+        <button class="add-btn" onclick="adicionarClassCriativo('produto')" style="margin-top:8px;">+ Adicionar produto</button>
+      </div>
+      <div class="cfg-card" style="margin-top:16px;">
+        <div class="cfg-card-title">Gancho <span style="font-size:11px;font-weight:400;color:var(--muted);">— tipo de abertura do criativo (dor, curiosidade, prova social...)</span></div>
+        <div id="class-gancho-list" style="margin-top:10px;"></div>
+        <button class="add-btn" onclick="adicionarClassCriativo('gancho')" style="margin-top:8px;">+ Adicionar gancho</button>
+      </div>
+      <div class="cfg-card" style="margin-top:16px;">
+        <div class="cfg-card-title">Formato <span style="font-size:11px;font-weight:400;color:var(--muted);">— estilo do criativo (UGC, POV, mãos mostrando produto...)</span></div>
+        <div id="class-formato-list" style="margin-top:10px;"></div>
+        <button class="add-btn" onclick="adicionarClassCriativo('formato')" style="margin-top:8px;">+ Adicionar formato</button>
+      </div>
+      <div class="cfg-hint" style="margin-top:12px;">Depois de cadastrados aqui, selecione o Produto/Gancho/Formato de cada campanha direto na aba Campanhas (colunas logo após "Conta de Anúncio"). Isso alimenta a taxa de validação segmentada na aba Análise MGD.</div>
     </div>
 
     <!-- ── ATUALIZAÇÃO ── -->
@@ -6177,6 +6207,11 @@ let CFG_MOTIVOS_PAUSA = carregar('cfg_motivos_pausa', [
   { id: 'mp4', nome: 'DATA ESPECIAL', alerta: true  },
   { id: 'mp5', nome: 'DIF CLIQUE',    alerta: true  },
 ]);
+// Classificação de criativo (Produto/Gancho/Formato) — usada pra calcular taxa
+// de validação segmentada. Cadastro em Configuração, seleção na aba Campanhas.
+let CFG_PRODUTOS = carregar('cfg_produtos', []);
+let CFG_GANCHOS  = carregar('cfg_ganchos', []);
+let CFG_FORMATOS = carregar('cfg_formatos', []);
 // Estrutura: [ {id, nome, data, cor} ]
 
 const CORES_DATA = [
@@ -6763,6 +6798,96 @@ function opsDragEnd(e) { e.currentTarget.style.opacity=''; e.currentTarget.style
 function _motivoPausaTemAlerta(nome) {
   return CFG_MOTIVOS_PAUSA.some(m => m.alerta && m.nome === nome);
 }
+
+// ═══════════════════════════════════════════
+// CONFIG — Classificação de criativo (Produto / Gancho / Formato)
+// Genérico pros 3 tipos, mesmo padrão de Motivos de Pausa (mas sem alerta).
+// ═══════════════════════════════════════════
+function _classGetArr(tipo) {
+  if (tipo === 'produto') return CFG_PRODUTOS;
+  if (tipo === 'gancho')  return CFG_GANCHOS;
+  if (tipo === 'formato') return CFG_FORMATOS;
+  return [];
+}
+function _classSetArr(tipo, arr) {
+  if (tipo === 'produto') CFG_PRODUTOS = arr;
+  else if (tipo === 'gancho') CFG_GANCHOS = arr;
+  else if (tipo === 'formato') CFG_FORMATOS = arr;
+}
+function _classChave(tipo) { return 'cfg_' + tipo + 's'; }
+
+function renderClassCriativo(tipo) {
+  const el = document.getElementById('class-' + tipo + '-list');
+  if (!el) return;
+  const arr = _classGetArr(tipo);
+  if (!arr.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Nenhum cadastrado ainda.</div>'; return; }
+  el.innerHTML = arr.map((item, i) => `
+    <div draggable="true" ondragstart="classDragStart(event,'${tipo}',${i})" ondragover="classDragOver(event)"
+      ondrop="classDrop(event,'${tipo}',${i})" ondragend="classDragEnd(event)"
+      style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:grab;">
+      <span style="color:var(--muted);font-size:14px;">⠿</span>
+      <input type="text" value="${esc(item.nome||'')}" placeholder="Nome"
+        style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--font);outline:none;"
+        onchange="updateClassCriativo('${tipo}','${item.id}',this.value)">
+      <button onclick="removerClassCriativo('${tipo}','${item.id}')"
+        style="font-size:11px;padding:2px 7px;border:1px solid var(--red-bdr);border-radius:5px;background:transparent;color:var(--red);cursor:pointer;">✕</button>
+    </div>`).join('');
+}
+
+function adicionarClassCriativo(tipo) {
+  const arr = _classGetArr(tipo);
+  arr.push({ id: uid(), nome: '' });
+  salvar(_classChave(tipo), arr);
+  renderClassCriativo(tipo);
+}
+
+function updateClassCriativo(tipo, id, valor) {
+  const arr = _classGetArr(tipo);
+  const item = arr.find(x => x.id === id);
+  if (!item) return;
+  const nomeAntigo = item.nome;
+  item.nome = valor;
+  salvar(_classChave(tipo), arr);
+  // Cascata: campanhas já marcadas com o nome antigo acompanham a mudança
+  if (nomeAntigo && nomeAntigo !== valor) {
+    let afetadas = 0;
+    Object.values(CFG_CAMPANHAS).forEach(c => { if (c && c[tipo] === nomeAntigo) { c[tipo] = valor; afetadas++; } });
+    if (afetadas > 0) { salvar('cfg_campanhas', CFG_CAMPANHAS); renderCampanhas(); }
+  }
+}
+
+function removerClassCriativo(tipo, id) {
+  const arr = _classGetArr(tipo);
+  const item = arr.find(x => x.id === id);
+  if (!item) return;
+  const emUso = Object.values(CFG_CAMPANHAS).filter(c => c && c[tipo] === item.nome).length;
+  if (emUso > 0) {
+    const ok = confirm(`"${item.nome}" está em uso em ${emUso} campanha(s). Se remover, essas campanhas voltam pra "—". Remover mesmo assim?`);
+    if (!ok) return;
+    Object.values(CFG_CAMPANHAS).forEach(c => { if (c && c[tipo] === item.nome) c[tipo] = ''; });
+    salvar('cfg_campanhas', CFG_CAMPANHAS);
+    renderCampanhas();
+  }
+  _classSetArr(tipo, arr.filter(x => x.id !== id));
+  salvar(_classChave(tipo), _classGetArr(tipo));
+  renderClassCriativo(tipo);
+}
+
+let _classDragIdx = {};
+function classDragStart(e, tipo, idx) { _classDragIdx[tipo] = idx; e.currentTarget.style.opacity = '0.4'; }
+function classDragOver(e) { e.preventDefault(); e.currentTarget.style.background = 'var(--blue-bg)'; }
+function classDrop(e, tipo, idx) {
+  e.preventDefault();
+  e.currentTarget.style.background = '';
+  const from = _classDragIdx[tipo];
+  if (from == null || from === idx) return;
+  const arr = _classGetArr(tipo);
+  const moved = arr.splice(from, 1)[0];
+  arr.splice(idx, 0, moved);
+  salvar(_classChave(tipo), arr);
+  renderClassCriativo(tipo);
+}
+function classDragEnd(e) { e.currentTarget.style.opacity = ''; e.currentTarget.style.background = ''; _classDragIdx = {}; }
 
 function renderMotivosPausa() {
   const el = document.getElementById('motivos-pausa-list');
@@ -8957,7 +9082,7 @@ const MGD_FAIXA_MEDIANO = 1.21, MGD_FAIXA_BOM = 1.40, MGD_FAIXA_CAMPEAO = 1.86;
 function _historicoDiarioCampanha(sid) {
   const key = (sid || '').toLowerCase();
   const porDia = {};
-  const get = dt => { if (!porDia[dt]) porDia[dt] = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0 }; return porDia[dt]; };
+  const get = dt => { if (!porDia[dt]) porDia[dt] = { gastoMeta:0, cliquesMeta:0, impressoes:0, cliquesShopee:0, comissao:0, imposto:0, pedidos:0, venda:0 }; return porDia[dt]; };
   for (const r of DADOS) {
     if ((r.Sub_ID || '').toLowerCase() !== key) continue;
     const dt = normData(r.Data);
@@ -8976,6 +9101,7 @@ function _historicoDiarioCampanha(sid) {
         m.comissao += com;
         m.imposto  += com * aliq;
         m.pedidos  += 1;
+        m.venda    += Number(r.Venda_Total) || 0;
       }
     }
   }
@@ -9179,9 +9305,510 @@ function _metricasDetalhadasDia(sid, dia) {
 // ═══════════════════════════════════════════
 let _mgdSelecionado = null;
 let _mgdDiaSelecionado = null;
+let _mgdBlocoTimeline = null; // qual bloco de 30 dias está exibido (null = calcula automático)
 const _MGD_MAPA_BADGE = { VALIDADO:'b-camp', MANTER:'b-bom', 'ATENÇÃO':'b-med', AGUARDAR:'b-aguardar', DESATIVAR:'b-pess', PAUSAR:'b-fraco' };
 
+// ROAS acumulado de verdade — D0 até HOJE, sempre o mesmo valor não importa qual
+// dia da linha do tempo você está olhando (diferente do "roasAcumulado" que a
+// regra de cada dia usa internamente, que pra D10+ é uma janela de 7 dias).
+function _roasAcumuladoTotalCampanha(sid) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return 0;
+  const porDia = _historicoDiarioCampanha(sid);
+  let g=0, c=0, i=0;
+  Object.keys(porDia).forEach(dt => {
+    if (dt < d0) return;
+    g += porDia[dt].gastoMeta;
+    c += porDia[dt].comissao;
+    i += porDia[dt].imposto;
+  });
+  return g > 0 ? (c - i) / g : 0;
+}
+
+// Tendência do CPC — compara o CPC de hoje com o de 2 dias atrás. Variação de
+// mais de 15% pra cima/baixo já conta como tendência (não é só ruído do dia).
+function _mgdTendenciaCPC(sid, diaAtual) {
+  if (diaAtual == null || diaAtual < 2) return null;
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return null;
+  const porDia = _historicoDiarioCampanha(sid);
+  const diaData = n => { const d = new Date(d0+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const cpcDoDia = n => { const mm = porDia[diaData(n)]; return (mm && mm.cliquesMeta>0) ? mm.gastoMeta/mm.cliquesMeta : null; };
+  const cpcHoje  = cpcDoDia(diaAtual);
+  const cpcAntes = cpcDoDia(diaAtual-2);
+  if (cpcHoje == null || cpcAntes == null || cpcAntes <= 0) return null;
+  const variacao = (cpcHoje - cpcAntes) / cpcAntes;
+  if (variacao > 0.15) return 'subindo';
+  if (variacao < -0.15) return 'caindo';
+  return 'estavel';
+}
+
+// Alertas automáticos de uma campanha — todos derivados do motor de veredito
+// já existente, sem nenhuma nota nova inventada.
+function _mgdAlertasCampanha(sid) {
+  const info = _analisarMGD(sid);
+  const alertas = [];
+  if (info.dia === 7 && (info.classificacao === 'Bom' || info.classificacao === 'Campeão'))
+    alertas.push('🟢 Excelente momento pra escalar');
+  if (info.veredito === 'ATENÇÃO')
+    alertas.push('🟡 Continue observando');
+  if (info.dia != null && info.dia >= 5 && _roasAcumuladoTotalCampanha(sid) < MGD_BREAKEVEN)
+    alertas.push('🔴 ROAS caiu abaixo do breakeven');
+  if (_mgdTendenciaCPC(sid, info.dia) === 'subindo')
+    alertas.push('🟠 CPC começou a subir');
+  if (info.veredito === 'PAUSAR')
+    alertas.push('🔴 Criativo perdeu estabilidade');
+  return alertas;
+}
+
+// ═══════════════════════════════════════════
+// TAXA DE VALIDAÇÃO — validação é do CRIATIVO, não da campanha em si (mas
+// aqui cada campanha representa 1 criativo testado).
+// "Testado" = todo criativo que já teve D0 (gasto), mesmo que tenha sido
+// desativado antes do D4 — se entrou em teste, conta.
+// "Validado" = ROAS acumulado ATUAL (hoje) ≥ breakeven E já viveu até pelo
+// menos o D4 — não precisa ter batido o breakeven especificamente NO D4; se
+// caiu no D4 mas recuperou depois, conta como validado do mesmo jeito.
+// ═══════════════════════════════════════════
+// Último dia em que a campanha teve gasto de verdade (D-número) — usado pro
+// "tempo até pausar" real, em vez de dias de calendário (que ficaria enorme
+// pra campanha desativada há muito tempo).
+function _ultimoDiaComGasto(sid) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return null;
+  const porDia = _historicoDiarioCampanha(sid);
+  let ultimaData = null;
+  Object.keys(porDia).forEach(dt => {
+    if (dt < d0) return;
+    if (porDia[dt].gastoMeta > 0 && (!ultimaData || dt > ultimaData)) ultimaData = dt;
+  });
+  if (!ultimaData) return null;
+  return Math.round((new Date(ultimaData+'T00:00:00') - new Date(d0+'T00:00:00')) / 86400000);
+}
+
+// Primeiro dia (a partir do D4) em que o ROAS acumulado cruzou o breakeven —
+// o "tempo até validar" de verdade, não mais preso ao D4 fixo.
+function _primeiroDiaValidacao(sid) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return null;
+  const infoHoje = _analisarMGD(sid);
+  if (infoHoje.dia == null || infoHoje.dia < 4) return null;
+  const porDia = _historicoDiarioCampanha(sid);
+  const diaData = n => { const d = new Date(d0+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  let g=0, c=0, i=0;
+  for (let n = 0; n <= infoHoje.dia; n++) {
+    const m = porDia[diaData(n)];
+    if (m) { g += m.gastoMeta; c += m.comissao; i += m.imposto; }
+    if (n >= 4 && g > 0 && (c-i)/g >= MGD_BREAKEVEN) return n;
+  }
+  return null;
+}
+
+// Segunda-feira da semana de uma data — usado pra agrupar "testes por semana"
+function _mgdSemanaKey(dataObj) {
+  const dt = new Date(dataObj);
+  const diaSemana = dt.getDay();
+  const diffSeg = (diaSemana === 0 ? -6 : 1 - diaSemana);
+  dt.setDate(dt.getDate() + diffSeg);
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+
+function _mgdMetricasValidacao() {
+  const sids = Object.keys(CFG_CAMPANHAS).filter(sid => _primeiraDataGasto(sid) != null);
+
+  let gastoTotalValidados = 0;
+  let reprovados = 0;
+  const validados = [];
+  const porMes = {}, porProduto = {}, porGancho = {}, porFormato = {};
+  const bump = (mapa, chave, valido) => {
+    if (!chave) return;
+    if (!mapa[chave]) mapa[chave] = { testados: 0, validados: 0 };
+    mapa[chave].testados++;
+    if (valido) mapa[chave].validados++;
+  };
+
+  sids.forEach(sid => {
+    const infoHoje = _analisarMGD(sid);
+    const cfgC = CFG_CAMPANHAS[sid] || {};
+    // Validação é permanente: se cruzou o breakeven em QUALQUER dia (a partir
+    // do D4), continua validado pra sempre, mesmo que o ROAS caia depois.
+    const diaValidacao = _primeiroDiaValidacao(sid);
+    const valido = diaValidacao != null;
+    // Reprovado é contado direto (não é só "100% - validado"), pra sobrar
+    // espaço pra status futuros (Em teste, Arquivado etc) sem forçar a conta
+    // a fechar em 100%. Reprovado = não validou E não está mais ativa.
+    const ativa = (cfgC.effective_status||'').toUpperCase() === 'ACTIVE';
+    const reprovado = !valido && (!ativa || infoHoje.veredito === 'DESATIVAR' || infoHoje.veredito === 'PAUSAR');
+    if (reprovado) reprovados++;
+
+    const d0 = _primeiraDataGasto(sid);
+    const mesKey = d0.slice(0, 7);
+    if (!porMes[mesKey]) porMes[mesKey] = { testados: 0, validados: 0, campeoes: 0, gastoTotal: 0 };
+    porMes[mesKey].testados++;
+    if (valido) porMes[mesKey].validados++;
+    if (infoHoje.classificacao === 'Campeão') porMes[mesKey].campeoes++;
+
+    bump(porProduto, cfgC.produto, valido);
+    bump(porGancho,  cfgC.gancho,  valido);
+    bump(porFormato, cfgC.formato, valido);
+
+    // Gasto total da campanha (D0→hoje) — precisa de TODAS, não só validadas,
+    // pra "custo por campeão" mensal fazer conta certa (investimento total do
+    // mês ÷ campeões daquele mês).
+    const porDia = _historicoDiarioCampanha(sid);
+    let gastoTotal = 0, comissaoTotal = 0, impostoTotal = 0, vendaTotal = 0, somaRoasDiario = 0, diasComGasto = 0;
+    Object.keys(porDia).forEach(dt => {
+      if (dt < d0) return;
+      const m = porDia[dt];
+      gastoTotal    += m.gastoMeta;
+      comissaoTotal += m.comissao;
+      impostoTotal  += m.imposto;
+      vendaTotal    += m.venda || 0;
+      if (m.gastoMeta > 0) {
+        somaRoasDiario += (m.comissao - m.imposto) / m.gastoMeta;
+        diasComGasto++;
+      }
+    });
+    porMes[mesKey].gastoTotal += gastoTotal;
+
+    if (valido) {
+      gastoTotalValidados += gastoTotal;
+      validados.push({
+        sid,
+        roasMedio:     diasComGasto > 0 ? somaRoasDiario / diasComGasto : 0,
+        lucroGerado:   (comissaoTotal - impostoTotal) - gastoTotal,
+        receitaGerada: vendaTotal,
+        diasEmEscala:  Math.max(0, infoHoje.dia - 6), // dias vividos a partir do D7 (decisão de escala é sempre nesse dia, regra fixa do framework)
+        status:        infoHoje.classificacao === 'Campeão' ? 'Campeão' : (infoHoje.dia >= 7 ? 'Escala' : infoHoje.dia >= 5 ? 'Pré-Escala' : 'Validado'),
+      });
+    }
+  });
+
+  const testados = sids.length;
+  const nValidados = validados.length;
+  const taxa = testados > 0 ? (nValidados/testados*100) : 0;
+  return {
+    testados, validados: nValidados,
+    taxa,
+    reprovados,
+    taxaMortalidade: testados > 0 ? (reprovados/testados*100) : 0,
+    custoMedio: nValidados > 0 ? (gastoTotalValidados/nValidados) : null,
+    topCampeoes: validados.sort((a,b)=>b.roasMedio-a.roasMedio).slice(0,10),
+    porMes, porProduto, porGancho, porFormato,
+  };
+}
+
+// ═══════════════════════════════════════════
+// MÉTRICAS DE OPERAÇÃO — funil, custo por campeão, ROI dos testes, tempos
+// médios (pausar/validar, calculados de verdade, não em dias fixos) e a
+// Biblioteca de Campeões pesquisável.
+// ═══════════════════════════════════════════
+function _mgdMetricasOperacao() {
+  const sids = Object.keys(CFG_CAMPANHAS).filter(sid => _primeiraDataGasto(sid) != null);
+
+  let gastoTotalGeral = 0, lucroTotalGeral = 0, campeoes = 0;
+  const temposPausar = [], temposValidar = [];
+  const porSemana = {};
+  const biblioteca = [];
+  let validadosCount = 0, preEscalaCount = 0, escalaCount = 0;
+
+  sids.forEach(sid => {
+    const cfgC = CFG_CAMPANHAS[sid] || {};
+    const infoHoje = _analisarMGD(sid);
+    const porDia = _historicoDiarioCampanha(sid);
+    const d0 = _primeiraDataGasto(sid);
+
+    let gastoC=0, comC=0, impC=0;
+    Object.keys(porDia).forEach(dt => {
+      if (dt < d0) return;
+      gastoC += porDia[dt].gastoMeta;
+      comC   += porDia[dt].comissao;
+      impC   += porDia[dt].imposto;
+    });
+    gastoTotalGeral += gastoC;
+    const lucroC = (comC - impC) - gastoC;
+    lucroTotalGeral += lucroC;
+
+    const roasHoje = gastoC > 0 ? (comC - impC) / gastoC : 0;
+    const diaValidacao = _primeiroDiaValidacao(sid);
+    const validadoHoje = diaValidacao != null; // validação é permanente, não estado atual
+    if (validadoHoje) validadosCount++;
+    if (infoHoje.dia != null && infoHoje.dia >= 5 && infoHoje.dia <= 9 && infoHoje.veredito === 'MANTER') preEscalaCount++;
+    if (infoHoje.dia != null && infoHoje.dia >= 7 && validadoHoje) escalaCount++;
+
+    if (infoHoje.classificacao === 'Campeão') {
+      campeoes++;
+      biblioteca.push({
+        sid, produto: cfgC.produto || '—', gancho: cfgC.gancho || '—', formato: cfgC.formato || '—',
+        roas: roasHoje, lucro: lucroC, diasEmEscala: Math.max(0, infoHoje.dia - 6), status: infoHoje.veredito,
+      });
+    }
+
+    if ((cfgC.effective_status || '').toUpperCase() !== 'ACTIVE') {
+      const ult = _ultimoDiaComGasto(sid);
+      if (ult != null) temposPausar.push(ult);
+    }
+    if (validadoHoje) {
+      temposValidar.push(diaValidacao);
+    }
+
+    const semanaKey = _mgdSemanaKey(new Date(d0+'T00:00:00'));
+    porSemana[semanaKey] = (porSemana[semanaKey] || 0) + 1;
+  });
+
+  const media = arr => arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : null;
+
+  return {
+    testados: sids.length,
+    campeoes,
+    custoPorCampeao: campeoes > 0 ? (gastoTotalGeral/campeoes) : null,
+    roiTestes: gastoTotalGeral > 0 ? (lucroTotalGeral/gastoTotalGeral*100) : null,
+    tempoMedioPausar: media(temposPausar),
+    tempoMedioValidar: media(temposValidar),
+    porSemana,
+    funil: { testados: sids.length, validados: validadosCount, preEscala: preEscalaCount, escala: escalaCount, campeoes },
+    biblioteca: biblioteca.sort((a,b) => b.roas - a.roas),
+  };
+}
+
+
+function toggleTaxaValidacao() {
+  const el = document.getElementById('mgd-validacao');
+  const btn = document.getElementById('btn-taxa-validacao');
+  if (!el) return;
+  const abrir = el.style.display === 'none';
+  el.style.display = abrir ? 'block' : 'none';
+  if (btn) btn.textContent = abrir ? '▲ Esconder taxa de validação' : '📊 Ver taxa de validação';
+  if (abrir) renderTaxaValidacao();
+}
+
+function renderTaxaValidacao() {
+  const el = document.getElementById('mgd-validacao');
+  if (!el) return;
+  const m = _mgdMetricasValidacao();
+  const fmtR = v => v.toFixed(2).replace('.',',');
+  const fmtPct = v => v.toFixed(1).replace('.',',') + '%';
+
+  const tabelaSegmentada = (titulo, mapa) => {
+    const chaves = Object.keys(mapa).sort((a,b) => mapa[b].testados - mapa[a].testados);
+    if (!chaves.length) return `<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">${titulo}: nenhuma campanha classificada ainda.</div>`;
+    return `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${titulo}</div>
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        ${chaves.map((k,i) => {
+          const d = mapa[k];
+          const taxa = d.testados>0 ? (d.validados/d.testados*100) : 0;
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;${i<chaves.length-1?'border-bottom:1px solid var(--border);':''}">
+            <span style="font-size:12px;">${esc(k)}</span>
+            <span style="font-size:12px;color:var(--muted);">${d.validados}/${d.testados} · ${fmtPct(taxa)}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  };
+
+  const mesesOrdenados = Object.keys(m.porMes).sort();
+  const fmtMes = mk => { const [ano,mes] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(mes,10)-1]||mes) + '/' + ano.slice(2); };
+  const tabelaMensal = mesesOrdenados.length ? `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Comparativo entre meses (agrupado pelo mês de lançamento de cada campanha)</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">KPI</th>
+            ${mesesOrdenados.map(mk => `<th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">${esc(fmtMes(mk))}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:7px 12px;">Testados</td>
+            ${mesesOrdenados.map(mk => `<td style="padding:7px 12px;text-align:right;">${m.porMes[mk].testados}</td>`).join('')}
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:7px 12px;">Validados</td>
+            ${mesesOrdenados.map(mk => `<td style="padding:7px 12px;text-align:right;">${m.porMes[mk].validados}</td>`).join('')}
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:7px 12px;">Taxa</td>
+            ${mesesOrdenados.map(mk => { const d=m.porMes[mk]; const taxa = d.testados>0?(d.validados/d.testados*100):0; return `<td style="padding:7px 12px;text-align:right;">${fmtPct(taxa)}</td>`; }).join('')}
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:7px 12px;">Campeões</td>
+            ${mesesOrdenados.map(mk => `<td style="padding:7px 12px;text-align:right;">${m.porMes[mk].campeoes}</td>`).join('')}
+          </tr>
+          <tr>
+            <td style="padding:7px 12px;">Custo/Campeão</td>
+            ${mesesOrdenados.map(mk => { const d=m.porMes[mk]; const custo = d.campeoes>0 ? d.gastoTotal/d.campeoes : null; return `<td style="padding:7px 12px;text-align:right;">${custo!=null ? 'R$ '+fmtR(custo) : '—'}</td>`; }).join('')}
+          </tr>
+        </tbody>
+      </table>
+    </div>` : '';
+
+  const topHtml = m.topCampeoes.length ? `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Top campeões — ordenado por ROAS médio</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">#</th>
+            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">Campanha</th>
+            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">ROAS médio</th>
+            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Lucro gerado</th>
+            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Receita gerada</th>
+            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Dias em escala</th>
+            <th style="text-align:center;padding:7px 12px;color:var(--muted);font-weight:500;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${m.topCampeoes.map((c,i) => `<tr style="${i<m.topCampeoes.length-1?'border-bottom:1px solid var(--border);':''}">
+            <td style="padding:7px 12px;">${i+1}</td>
+            <td style="padding:7px 12px;">${esc(c.sid)}</td>
+            <td style="padding:7px 12px;text-align:right;color:var(--green);font-weight:600;">${fmtR(c.roasMedio)}</td>
+            <td style="padding:7px 12px;text-align:right;color:${c.lucroGerado>=0?'var(--green)':'var(--red)'};">R$ ${fmtR(c.lucroGerado)}</td>
+            <td style="padding:7px 12px;text-align:right;">R$ ${fmtR(c.receitaGerada)}</td>
+            <td style="padding:7px 12px;text-align:right;">${c.diasEmEscala}</td>
+            <td style="padding:7px 12px;text-align:center;"><span class="badge ${c.status==='Campeão'?'b-camp':'b-bom'}" style="font-size:10px;">${esc(c.status)}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Nenhum criativo validado ainda.</div>';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Criativos testados</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.testados}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Criativos validados</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.validados}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Taxa de validação</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${fmtPct(m.taxa)}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Custo médio p/ validar</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoMedio!=null ? 'R$ '+fmtR(m.custoMedio) : '—'}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Taxa de mortalidade</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:var(--red);">${fmtPct(m.taxaMortalidade)}</div>
+      </div>
+    </div>
+    ${topHtml}
+    ${tabelaMensal}
+    ${tabelaSegmentada('Taxa de validação por Produto', m.porProduto)}
+    ${tabelaSegmentada('Taxa de validação por Gancho', m.porGancho)}
+    ${tabelaSegmentada('Taxa de validação por Formato', m.porFormato)}
+  `;
+}
+
+let _mgdBibliotecaCache = null; // cache da biblioteca completa, filtrada na hora da busca
+
+function toggleFunilOperacao() {
+  const el = document.getElementById('mgd-operacao');
+  const btn = document.getElementById('btn-funil-operacao');
+  if (!el) return;
+  const abrir = el.style.display === 'none';
+  el.style.display = abrir ? 'block' : 'none';
+  if (btn) btn.textContent = abrir ? '▲ Esconder funil e biblioteca' : '📈 Ver funil e biblioteca de campeões';
+  if (abrir) renderFunilOperacao();
+}
+
+function renderFunilOperacao() {
+  const el = document.getElementById('mgd-operacao');
+  if (!el) return;
+  const m = _mgdMetricasOperacao();
+  const fmtR = v => v.toFixed(2).replace('.',',');
+  const fmtPct = v => v.toFixed(1).replace('.',',') + '%';
+  const fmtDias = v => v == null ? '—' : v.toFixed(1).replace('.',',') + ' dias';
+  _mgdBibliotecaCache = m.biblioteca;
+
+  const etapas = [
+    ['Testados',    m.funil.testados,    100],
+    ['Validados',   m.funil.validados,   m.funil.testados>0 ? m.funil.validados/m.funil.testados*100 : 0],
+    ['Pré-Escala',  m.funil.preEscala,   m.funil.validados>0 ? m.funil.preEscala/m.funil.validados*100 : 0],
+    ['Escala',      m.funil.escala,      m.funil.preEscala>0 ? m.funil.escala/m.funil.preEscala*100 : 0],
+    ['Campeões',    m.funil.campeoes,    m.funil.escala>0 ? m.funil.campeoes/m.funil.escala*100 : 0],
+  ];
+  const funilHtml = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Funil da operação</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      ${etapas.map(([label,n,pct],i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;${i<etapas.length-1?'border-bottom:1px solid var(--border);':''}">
+          <span style="font-size:12px;width:90px;flex-shrink:0;">${esc(label)}</span>
+          <div style="flex:1;background:var(--bg3);border-radius:4px;height:16px;overflow:hidden;">
+            <div style="width:${Math.min(100,pct)}%;height:100%;background:#3b82f6;"></div>
+          </div>
+          <span style="font-size:12px;color:var(--muted);width:110px;text-align:right;flex-shrink:0;">${n} (${fmtPct(pct)})</span>
+        </div>`).join('')}
+    </div>`;
+
+  const semanasOrdenadas = Object.keys(m.porSemana).sort();
+  const semanasHtml = semanasOrdenadas.length ? `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Testes por semana (segunda-feira de início)</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      ${semanasOrdenadas.map((sk,i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;${i<semanasOrdenadas.length-1?'border-bottom:1px solid var(--border);':''}">
+        <span style="font-size:12px;">${fmtDataBR(sk)}</span>
+        <span style="font-size:12px;color:var(--muted);">${m.porSemana[sk]} teste(s)</span>
+      </div>`).join('')}
+    </div>` : '';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Custo por campeão</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoPorCampeao!=null ? 'R$ '+fmtR(m.custoPorCampeao) : '—'}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">ROI dos testes</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:${(m.roiTestes||0)>=0?'var(--green)':'var(--red)'};">${m.roiTestes!=null ? fmtPct(m.roiTestes) : '—'}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Tempo médio até validar</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${fmtDias(m.tempoMedioValidar)}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Tempo médio até pausar</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${fmtDias(m.tempoMedioPausar)}</div>
+      </div>
+    </div>
+    ${funilHtml}
+    ${semanasHtml}
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Biblioteca de Campeões</div>
+    <input type="text" placeholder="Buscar por produto, gancho, formato ou campanha..." oninput="_mgdFiltrarBiblioteca(this.value)"
+      style="width:100%;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-family:var(--font);background:var(--bg2);color:var(--text);margin-bottom:10px;outline:none;">
+    <div id="mgd-biblioteca-lista"></div>
+  `;
+  _mgdFiltrarBiblioteca('');
+}
+
+function _mgdFiltrarBiblioteca(termo) {
+  const el = document.getElementById('mgd-biblioteca-lista');
+  if (!el || !_mgdBibliotecaCache) return;
+  const t = (termo || '').toLowerCase().trim();
+  const filtrados = !t ? _mgdBibliotecaCache : _mgdBibliotecaCache.filter(c =>
+    (c.sid||'').toLowerCase().includes(t) || (c.produto||'').toLowerCase().includes(t) ||
+    (c.gancho||'').toLowerCase().includes(t) || (c.formato||'').toLowerCase().includes(t)
+  );
+  if (!filtrados.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum campeão encontrado.</div>'; return; }
+  el.innerHTML = filtrados.map(c => `
+    <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;">${esc(c.sid)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;color:var(--muted);">
+        <span>📦 ${esc(c.produto)}</span>
+        <span>🎣 ${esc(c.gancho)}</span>
+        <span>🎬 ${esc(c.formato)}</span>
+        <span style="color:var(--green);font-weight:600;">ROAS ${c.roas.toFixed(2).replace('.',',')}</span>
+        <span style="color:${c.lucro>=0?'var(--green)':'var(--red)'};">Lucro R$ ${c.lucro.toFixed(2).replace('.',',')}</span>
+        <span>${c.diasEmEscala} dias em escala</span>
+      </div>
+    </div>`).join('');
+}
+
+
 function renderAnaliseMGD() {
+  const cardsEl = document.getElementById('mgd-cards');
   const listaEl = document.getElementById('mgd-lista-campanhas');
   const detalheEl = document.getElementById('mgd-detalhe');
   if (!listaEl || !detalheEl) return;
@@ -9192,9 +9819,37 @@ function renderAnaliseMGD() {
     .filter(sid => _primeiraDataGasto(sid) != null);
 
   if (!sids.length) {
+    if (cardsEl) cardsEl.innerHTML = '';
     listaEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 4px;">Nenhuma campanha ativa com histórico de gasto ainda.</div>';
     detalheEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">Assim que uma campanha ativa tiver gasto registrado, ela aparece aqui.</div>';
     return;
+  }
+
+  // Cards contadores — categorias mapeadas direto do motor de veredito (não é
+  // um score novo, só uma contagem de quantas campanhas caem em cada balde).
+  if (cardsEl) {
+    let campeoes=0, prontosEscalar=0, preEscala=0, promissores=0, reprovados=0;
+    sids.forEach(sid => {
+      const info = _analisarMGD(sid);
+      if (info.classificacao === 'Campeão') campeoes++;
+      if (info.dia === 7 && (info.classificacao === 'Bom' || info.classificacao === 'Campeão')) prontosEscalar++;
+      else if (info.dia >= 5 && info.dia <= 9 && info.veredito === 'MANTER') preEscala++;
+      if (info.dia <= 3 && info.veredito === 'MANTER') promissores++;
+      if (info.veredito === 'DESATIVAR' || info.veredito === 'PAUSAR') reprovados++;
+    });
+    const cardDef = [
+      ['🏆','Campeões', campeoes, '#166534'],
+      ['🚀','Prontos p/ Escalar', prontosEscalar, 'var(--green)'],
+      ['🟢','Pré-Escala', preEscala, 'var(--green)'],
+      ['🟡','Promissores', promissores, 'var(--yellow)'],
+      ['🔴','Reprovados', reprovados, 'var(--red)'],
+    ];
+    cardsEl.innerHTML = cardDef.map(([ico,label,n,cor]) => `
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;text-align:center;">
+        <div style="font-size:20px;">${ico}</div>
+        <div style="font-size:18px;font-weight:700;margin-top:2px;color:${cor};">${n}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px;">${label}</div>
+      </div>`).join('');
   }
 
   if (!_mgdSelecionado || !sids.includes(_mgdSelecionado)) { _mgdSelecionado = sids[0]; _mgdDiaSelecionado = null; }
@@ -9216,11 +9871,17 @@ function renderAnaliseMGD() {
 function _mgdSelecionarCampanha(sid) {
   _mgdSelecionado = sid;
   _mgdDiaSelecionado = null;
+  _mgdBlocoTimeline = null;
   renderAnaliseMGD();
 }
 
 function _mgdSelecionarDia(dia) {
   _mgdDiaSelecionado = dia;
+  _mgdRenderDetalhe();
+}
+
+function _mgdMudarBloco(bloco) {
+  _mgdBlocoTimeline = bloco;
   _mgdRenderDetalhe();
 }
 
@@ -9235,11 +9896,24 @@ function _mgdRenderDetalhe() {
   const info = diaView === infoAtual.dia ? infoAtual : _analisarMGD(sid, diaView);
   const badgeCls = _MGD_MAPA_BADGE[info.veredito] || 'b-aguardar';
   const metricas = _metricasDetalhadasDia(sid, diaView);
-  const roasAc = info.roasAcumulado != null ? info.roasAcumulado : 0;
-  const margem = roasAc - MGD_BREAKEVEN;
+
+  // KPIs sempre mostram o acumulado real da campanha inteira (D0 até hoje) —
+  // não muda ao clicar em dias diferentes da linha do tempo. O número que a
+  // regra daquele dia específico usou (que pra D10+ é janela de 7 dias, não
+  // o acumulado total) continua visível no checklist "Métricas de Dxx" abaixo.
+  const roasTotal = _roasAcumuladoTotalCampanha(sid);
+  const margemTotal = roasTotal - MGD_BREAKEVEN;
+  const alertas = _mgdAlertasCampanha(sid);
+
+  // Linha do tempo paginada de 30 em 30 dias — evita uma fileira gigante
+  const totalBlocos = Math.floor(infoAtual.dia / 30) + 1;
+  let bloco = _mgdBlocoTimeline != null ? _mgdBlocoTimeline : Math.floor(diaView / 30);
+  bloco = Math.max(0, Math.min(bloco, totalBlocos - 1));
+  const blocoInicio = bloco * 30;
+  const blocoFim = Math.min(blocoInicio + 29, infoAtual.dia);
 
   let timelineHtml = '';
-  for (let d = 0; d <= infoAtual.dia; d++) {
+  for (let d = blocoInicio; d <= blocoFim; d++) {
     const infoD = d === infoAtual.dia ? infoAtual : _analisarMGD(sid, d);
     const cls = _MGD_MAPA_BADGE[infoD.veredito] || 'b-aguardar';
     const sel = d === diaView;
@@ -9247,6 +9921,14 @@ function _mgdRenderDetalhe() {
       style="flex:1;min-width:28px;text-align:center;padding:6px 2px;border-radius:6px;cursor:pointer;${sel?'outline:2px solid #2563eb;':''}"
       class="badge ${cls}"><span style="font-size:10px;font-weight:700;">D${d}</span></div>`;
   }
+  const navTimeline = totalBlocos > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <button onclick="_mgdMudarBloco(${bloco-1})" ${bloco===0?'disabled':''}
+        style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text);cursor:pointer;${bloco===0?'opacity:.4;cursor:default;':''}">◀</button>
+      <span style="font-size:11px;color:var(--muted);">D${blocoInicio}–D${blocoFim}</span>
+      <button onclick="_mgdMudarBloco(${bloco+1})" ${bloco>=totalBlocos-1?'disabled':''}
+        style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text);cursor:pointer;${bloco>=totalBlocos-1?'opacity:.4;cursor:default;':''}">▶</button>
+    </div>` : '';
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
@@ -9259,20 +9941,27 @@ function _mgdRenderDetalhe() {
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">ROAS acumulado</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;">${roasAc.toFixed(2).replace('.',',')}</div>
+        <div style="font-size:11px;color:var(--muted);">ROAS acumulado (total, D0→hoje)</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${roasTotal.toFixed(2).replace('.',',')}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Breakeven</div>
         <div style="font-size:18px;font-weight:600;margin-top:2px;">${MGD_BREAKEVEN.toFixed(2).replace('.',',')}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">Margem</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;color:${margem>=0?'var(--green)':'var(--red)'};">${margem>=0?'+':''}${margem.toFixed(2).replace('.',',')}</div>
+        <div style="font-size:11px;color:var(--muted);">Margem (sobre o total)</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:${margemTotal>=0?'var(--green)':'var(--red)'};">${margemTotal>=0?'+':''}${margemTotal.toFixed(2).replace('.',',')}</div>
       </div>
     </div>
 
+    ${alertas.length ? `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Alertas</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+      ${alertas.map(a => `<div style="font-size:12px;background:var(--bg2);border-radius:6px;padding:7px 10px;">${esc(a)}</div>`).join('')}
+    </div>` : ''}
+
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Linha do tempo — clique num dia pra ver o detalhe</div>
+    ${navTimeline}
     <div style="display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;">${timelineHtml}</div>
 
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Métricas de ${esc(info.fase)}</div>
@@ -10452,6 +11141,9 @@ function _campRenderCampanhasTabela() {
     <th style="min-width:140px;text-align:center">💰 Comissão</th>
     <th style="min-width:70px;text-align:left">Link</th>
     ${thS('Conta','Conta de<br>Anúncio','min-width:55px;white-space:normal')}
+    <th style="min-width:70px;text-align:left">Produto</th>
+    <th style="min-width:70px;text-align:left">Gancho</th>
+    <th style="min-width:70px;text-align:left">Formato</th>
     ${thS('plataforma','Plataforma','min-width:65px')}
     ${thS('tipo','Tipo','text-align:center')}
     ${thS('mes','Mês','text-align:center;min-width:65px')}
@@ -10593,6 +11285,21 @@ function _campRenderCampanhasTabela() {
         </div>
       </td>
       <td style="font-size:10px;color:var(--muted);text-align:left;">${esc(c.Conta || (cfg.meta_account_id ? (CFG_META.find(m => 'act_' + m.id === cfg.meta_account_id)?.nome || '') : ''))}</td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:85px;"
+          onchange="event.stopPropagation();_campSet('${sid}','produto',this.value)">
+          <option value="">—</option>
+          ${CFG_PRODUTOS.map(p=>`<option value="${esc(p.nome)}" ${cfg.produto===p.nome?'selected':''}>${esc(p.nome)}</option>`).join('')}
+        </select></td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:85px;"
+          onchange="event.stopPropagation();_campSet('${sid}','gancho',this.value)">
+          <option value="">—</option>
+          ${CFG_GANCHOS.map(g=>`<option value="${esc(g.nome)}" ${cfg.gancho===g.nome?'selected':''}>${esc(g.nome)}</option>`).join('')}
+        </select></td>
+      <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:85px;"
+          onchange="event.stopPropagation();_campSet('${sid}','formato',this.value)">
+          <option value="">—</option>
+          ${CFG_FORMATOS.map(f=>`<option value="${esc(f.nome)}" ${cfg.formato===f.nome?'selected':''}>${esc(f.nome)}</option>`).join('')}
+        </select></td>
       <td><select style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 3px;background:var(--bg2);max-width:75px;"
           onchange="event.stopPropagation();_campSetPlat('${sid}',this.value)">${selPlat}</select>
         <button onclick="event.stopPropagation();abrirHistPlat('${sid}')"

@@ -668,6 +668,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
     </div>
     <div class="toolbar-right">
       <button class="act-btn" id="btn-atualizar-meta-status" onclick="atualizarMetaStatusOrcamento()" title="Atualiza tudo: status, orçamento, link do criativo, comissão E o gasto real da Meta/pedidos da Shopee — mesma coisa que o '⚡ Atualizar API' do Dashboard">🔄 Atualizar Meta Ads</button>
+      <button class="act-btn" id="btn-exportar-links" onclick="exportarLinksAtivos()" title="Baixa um .xlsx com nome do anúncio e link do produto, só das campanhas ativas com link cadastrado">📤 Exportar Links Ativos</button>
     </div>
   </div>
   <div class="section">
@@ -5674,6 +5675,50 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
 }
 
 // Botão "Atualizar Meta Ads" da aba Campanhas — só status/orçamento/campanhas novas, SEM buscar 90 dias de gasto (rápido)
+// Exporta .xlsx com Nome do Anúncio + Link do Produto, só das campanhas
+// ATIVAS que já têm link cadastrado. Carrega a biblioteca xlsx só na hora do
+// clique (via CDN) — não fica pesando o carregamento normal da dashboard.
+let _xlsxLibCarregada = false;
+async function _garantirXLSXLib() {
+  if (_xlsxLibCarregada || window.XLSX) { _xlsxLibCarregada = true; return; }
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Não consegui carregar a biblioteca de exportação.'));
+    document.head.appendChild(s);
+  });
+  _xlsxLibCarregada = true;
+}
+
+async function exportarLinksAtivos() {
+  const btn = document.getElementById('btn-exportar-links');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Gerando...'; }
+  try {
+    await _garantirXLSXLib();
+    const linhas = Object.entries(CFG_CAMPANHAS)
+      .filter(([sid, c]) => c && (c.effective_status || '').toUpperCase() === 'ACTIVE' && c.link)
+      .map(([sid, c]) => ({ 'Nome do Anúncio': sid, 'Link do Produto': c.link }));
+
+    if (!linhas.length) {
+      toast('Nenhuma campanha ativa com link cadastrado foi encontrada.', 'warn');
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    ws['!cols'] = [{ wch: 45 }, { wch: 70 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Links Ativos');
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `links_anuncios_ativos_${hoje}.xlsx`);
+    toast(`Exportado: ${linhas.length} anúncio(s) ativo(s) com link.`, 'ok');
+  } catch (ex) {
+    toast('Erro ao exportar: ' + ex.message, 'warn');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Exportar Links Ativos'; }
+  }
+}
+
 async function atualizarMetaStatusOrcamento() {
   const btn = document.getElementById('btn-atualizar-meta-status');
   const metaAtivas = CFG_META.filter(c => c.ativo && c.accountId && c.token);

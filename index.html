@@ -92,7 +92,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 /* ── TABLE ── */
 .tbl-wrap { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 280px); }
 table { width:100%; border-collapse:collapse; font-size:12px; }
-th { padding:7px 8px; text-align:right; font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:pointer; background:var(--bg3); position:sticky; top:0; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.08); }
+th { padding:7px 8px; text-align:right; font-size:10px; font-weight:700; color:#f0efec; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:pointer; background:#2d2b27; position:sticky; top:0; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.08); }
 th:first-child { text-align:left; }
 th.sorted { color:#2563eb; }
 th:hover { color:var(--text); }
@@ -633,13 +633,14 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
             <th style="text-align:center;width:50px;">Link</th>
             <th style="text-align:right;width:90px;cursor:pointer;" onclick="setPedidosSort('Comissao')">Comissão <span id="pedidos-sort-Comissao"></span></th>
             <th style="text-align:right;cursor:pointer;" onclick="setPedidosSort('Venda_Total')">Venda <span id="pedidos-sort-Venda_Total"></span></th>
+            <th style="text-align:center;width:80px;cursor:pointer;" onclick="setPedidosSort('Venda_Direta')">Venda <span id="pedidos-sort-Venda_Direta"></span></th>
             <th style="text-align:left;width:140px;cursor:pointer;" onclick="setPedidosSort('Sub_ID')">Sub_ID <span id="pedidos-sort-Sub_ID"></span></th>
             <th style="text-align:left;width:80px;cursor:pointer;" onclick="setPedidosSort('Conta')">Plataforma <span id="pedidos-sort-Conta"></span></th>
             <th style="text-align:right;cursor:pointer;" onclick="setPedidosSort('Status')">Status <span id="pedidos-sort-Status"></span></th>
           </tr>
         </thead>
         <tbody id="pedidos-body">
-          <tr><td colspan="10" class="empty">Carregando...</td></tr>
+          <tr><td colspan="11" class="empty">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -723,8 +724,20 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       <div style="font-size:12px;color:var(--muted);margin:0 0 8px;padding:0 4px;">Campanhas ativas</div>
       <div id="mgd-lista-campanhas"></div>
     </div>
-    <div style="flex:1;min-width:0;" id="mgd-detalhe"></div>
+    <div id="mgd-detalhe" style="flex:1;min-width:0;"></div>
   </div>
+</div>
+<!-- ══════════════════════════════════════════
+     PÁGINA: VENDAS DIRETAS VS COOKIE
+══════════════════════════════════════════ -->
+<div class="page" id="page-vendas-cookie">
+  <div class="period-btns" style="margin-bottom:16px;">
+    <button class="period-btn active" id="vc-p-30d" onclick="setVendasCookiePeriodo('30d',this)">30 dias</button>
+    <button class="period-btn"        id="vc-p-mes" onclick="setVendasCookiePeriodo('mes',this)">Este mês</button>
+    <button class="period-btn"        id="vc-p-ano" onclick="setVendasCookiePeriodo('ano',this)">Este ano</button>
+    <button class="period-btn"        id="vc-p-max" onclick="setVendasCookiePeriodo('max',this)">Máximo</button>
+  </div>
+  <div id="vc-conteudo"></div>
 </div>
 <!-- ══════════════════════════════════════════
      PÁGINA: GRUPOS WHATS
@@ -1891,6 +1904,7 @@ function _mapPedido(r) {
     Comissao:      Math.round((Number(r.comissao_bruta) || 0) * 100) / 100,
     Venda_Total:   Math.round((Number(r.venda_total)    || 0) * 100) / 100,
     Venda_Direta:  r.venda_direta ? 1 : 0,
+    Atraso_Clique_Horas: (r.atraso_clique_horas != null) ? Number(r.atraso_clique_horas) : null,
     Gasto_Meta:    0,
     Cliques_Meta:  0,
     Cliques_Shopee:0,
@@ -2095,7 +2109,7 @@ async function _carregarPeriodoMgv(de, ate) {
       return todos;
     };
 
-    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link';
+    const SEL_PEDIDOS = 'order_id,data_pedido,conta,sub_id,status,comissao_bruta,venda_total,venda_direta,atraso_clique_horas,nome_item,item_link';
     const SEL_META     = 'id,data,conta,campanha,gasto,conta_meta_id,status_camp';
 
     const [pedidos, meta, manuais] = await Promise.all([
@@ -4754,6 +4768,7 @@ async function handleFiles(files) {
               comissao_bruta:  Number(r.Comissao)    || 0,
               venda_total:     Number(r.Venda_Total)  || 0,
               venda_direta:    Number(r.Venda_Direta) > 0,
+              atraso_clique_horas: (r.Atraso_Clique_Horas != null) ? Number(r.Atraso_Clique_Horas) : null,
               item_name:       r.Nome_Item    || null,
               item_link:       r.item_link    || null,
               fonte:           'csv',
@@ -4902,6 +4917,21 @@ function parsearCSV(txt, tipo, conta, nomeArquivo) {
       const _hora   = horario ? parseInt(horario.slice(11,13)) || 0 : null;
       if (!data || data === '0000-00-00') return;
 
+      // Tempo dos Cliques: quando a pessoa clicou no link (6ª coluna do relatório
+      // de vendas da Shopee) — comparado com "Horário do pedido" (quando comprou
+      // de fato) dá o atraso real entre clique e compra, usado pra identificar
+      // venda por cookie de verdade (compra depois de um tempo, não na hora).
+      const tempoClique = get(row,'Tempo dos Cliques') || get(row,'Tempo') || '';
+      let atrasoHoras = null;
+      if (tempoClique && horario) {
+        const dtClique = new Date(tempoClique.replace(' ', 'T'));
+        const dtPedido = new Date(horario.replace(' ', 'T'));
+        if (!isNaN(dtClique) && !isNaN(dtPedido)) {
+          atrasoHoras = (dtPedido - dtClique) / 3600000;
+          if (atrasoHoras < 0) atrasoHoras = null; // dado inconsistente, ignora
+        }
+      }
+
       // Status do item do afiliado (campo correto para CSV oficial)
       const statusItem   = (get(row,'Status do item do afiliado') || '').trim();
       const statusPedido = (get(row,'Status do Pedido') || get(row,'Status do pedido') || '').trim();
@@ -4987,6 +5017,7 @@ function parsearCSV(txt, tipo, conta, nomeArquivo) {
           Cliques_Shopee: 0,
           Pedidos_Total: (statusFinal === 'PENDING' || statusFinal === 'COMPLETED') ? 1 : 0,
           Venda_Direta: isVendaDireta ? 1 : 0,
+          Atraso_Clique_Horas: atrasoHoras,
           _fonte:       'csv',
           Nome_Item:    get(row, 'Nome do Item') || get(row, 'Nome do item') || get(row, 'Item Name') || null,
           item_link:    (get(row, 'ID da loja') && get(row, 'ID do item'))
@@ -6263,10 +6294,10 @@ function renderDatas() {
       <table style="width:100%;border-collapse:collapse;font-size:12px;" id="datas-table">
         <thead>
           <tr style="background:var(--bg3);">
-            <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Nome</th>
-            <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Data</th>
-            <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Plataforma</th>
-            <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Cor</th>
+            <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Nome</th>
+            <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Data</th>
+            <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Plataforma</th>
+            <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Cor</th>
             <th style="padding:7px 10px;border-bottom:1px solid var(--border);"></th>
           </tr>
         </thead>
@@ -6376,9 +6407,9 @@ function renderPeriodosMeta(contaId) {
   if (!periodos.length) return '<div style="font-size:11px;color:var(--muted);">Nenhum período cadastrado.</div>';
   return `<table style="width:100%;border-collapse:collapse;font-size:12px;">
     <thead><tr style="background:var(--bg3);">
-      <th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);">Data início</th>
-      <th style="padding:5px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);">Data fim</th>
-      <th style="padding:5px 8px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border);">Alíquota %</th>
+      <th style="padding:5px 8px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);">Data início</th>
+      <th style="padding:5px 8px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);">Data fim</th>
+      <th style="padding:5px 8px;text-align:right;color:#c9c6be;border-bottom:1px solid var(--border);">Alíquota %</th>
       <th style="padding:5px 8px;border-bottom:1px solid var(--border);"></th>
     </tr></thead>
     <tbody>
@@ -6460,10 +6491,10 @@ function _renderPeriodosFiscaisHTML(nome) {
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead>
         <tr style="background:var(--bg3);">
-          <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Data início</th>
-          <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Data fim</th>
-          <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Tipo</th>
-          <th style="padding:6px 8px;text-align:right;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Alíquota %</th>
+          <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Data início</th>
+          <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Data fim</th>
+          <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Tipo</th>
+          <th style="padding:6px 8px;text-align:right;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Alíquota %</th>
           <th style="padding:6px 8px;border-bottom:1px solid var(--border);"></th>
         </tr>
       </thead>
@@ -6524,10 +6555,10 @@ function renderFiscal() {
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead>
             <tr style="background:var(--bg3);">
-              <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Data início</th>
-              <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Data fim</th>
-              <th style="padding:6px 8px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Tipo</th>
-              <th style="padding:6px 8px;text-align:right;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Alíquota %</th>
+              <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Data início</th>
+              <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Data fim</th>
+              <th style="padding:6px 8px;text-align:left;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Tipo</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:600;color:#c9c6be;border-bottom:1px solid var(--border);">Alíquota %</th>
               <th style="padding:6px 8px;border-bottom:1px solid var(--border);"></th>
             </tr>
           </thead>
@@ -6740,10 +6771,10 @@ function renderOperacoes() {
     <div style="overflow-x:auto;margin-top:8px;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr style="background:var(--bg3);">
-          <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;width:30px;"></th>
-          <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Sub_ID</th>
-          <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Operação</th>
-          <th style="padding:7px 10px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;">Tipo</th>
+          <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;width:30px;"></th>
+          <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Sub_ID</th>
+          <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Operação</th>
+          <th style="padding:7px 10px;text-align:left;color:#c9c6be;border-bottom:1px solid var(--border);font-weight:600;">Tipo</th>
           <th style="padding:7px 10px;border-bottom:1px solid var(--border);"></th>
         </tr></thead>
         <tbody id="ops-tbody">
@@ -7010,9 +7041,10 @@ const _navAbasPadrao = () => ([
   { id:'campanhas', label:'Campanhas', icon:'🚀', desc:'Gerencia campanhas, orçamento e plataforma vigente.', visible:true, ordem:1 },
   { id:'analise-mgd', label:'Análise MGD', icon:'🎯', desc:'Veredito diário por campanha, do D0 ao D10+, com o motivo de cada decisão.', visible:true, ordem:2 },
   { id:'pedidos', label:'Pedidos', icon:'📋', desc:'Mostra pedidos, status e comissões por plataforma.', visible:true, ordem:3 },
-  { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:4 },
-  { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:5 },
-  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:6 },
+  { id:'vendas-cookie', label:'Direta x Cookie', icon:'🍪', desc:'Separa vendas diretas de vendas por cookie, com ranking de produtos e campanhas.', visible:true, ordem:4 },
+  { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:5 },
+  { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:6 },
+  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:7 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -7138,6 +7170,8 @@ function renderNavAbas() {
         ? "showPage('pedidos',this);_renderPedidosComOpacidade()"
         : a.id === 'analise-mgd'
         ? "showPage('analise-mgd',this);renderAnaliseMGD()"
+        : a.id === 'vendas-cookie'
+        ? "showPage('vendas-cookie',this);renderVendasCookie()"
         : `showPage('${a.id}',this)`,
     })),
   ];
@@ -9120,6 +9154,9 @@ function _cpcD0Campanha(sid) {
 // "ROI" no material = ROAS líquido (comissão − imposto) / gasto, sempre.
 // ═══════════════════════════════════════════
 const MGD_BREAKEVEN = 1.22;
+// Formata valor em R$ com separador de milhar (ponto) e decimal (vírgula) —
+// diferente do fmtR usado pra ROAS/percentuais, que não precisa de milhar.
+function _mgdFmtBRL(v) { return (Number(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 // Faixas de pré-escala (D6+), ajustadas proporcionalmente do material original
 // (1,3-1,5/1,5-2/2+ com breakeven 1,31) pro breakeven real de 1,22.
 const MGD_FAIXA_MEDIANO = 1.21, MGD_FAIXA_BOM = 1.40, MGD_FAIXA_CAMPEAO = 1.86;
@@ -9338,17 +9375,17 @@ function _metricasDetalhadasDia(sid, dia) {
 
   if (dia === 0) {
     const m0 = m(0);
-    itens.push({ label:'Gasto do dia', bom: m0.gastoMeta>=8, valor:`R$ ${fmtR(m0.gastoMeta)}` });
+    itens.push({ label:'Gasto do dia', bom: m0.gastoMeta>=8, valor:`R$ ${_mgdFmtBRL(m0.gastoMeta)}` });
     if (m0.gastoMeta >= 8 && m0.cliquesMeta > 0) {
       const cpc = m0.gastoMeta/m0.cliquesMeta;
-      itens.push({ label:'CPC', bom: cpc<0.20, valor:`R$ ${fmtR(cpc)}` });
+      itens.push({ label:'CPC', bom: cpc<0.20, valor:`R$ ${_mgdFmtBRL(cpc)}` });
     }
     return itens;
   }
   if (dia === 1) {
     const m1 = m(1);
     const cpc = m1.cliquesMeta>0 ? m1.gastoMeta/m1.cliquesMeta : null;
-    itens.push({ label:'CPC', bom: cpc!=null && cpc<0.15, valor: cpc!=null ? `R$ ${fmtR(cpc)}` : '—' });
+    itens.push({ label:'CPC', bom: cpc!=null && cpc<0.15, valor: cpc!=null ? `R$ ${_mgdFmtBRL(cpc)}` : '—' });
     itens.push({ label:'Cliques Shopee vs Meta', bom: m1.cliquesShopee >= m1.cliquesMeta, valor:`${m1.cliquesShopee} vs ${m1.cliquesMeta}` });
     itens.push({ label:'Pedidos', bom: m1.pedidos>0, valor:`${m1.pedidos}` });
     if (m1.impressoes >= 500) {
@@ -9831,7 +9868,7 @@ function renderTaxaValidacao() {
       </div>`;
   };
 
-  const mesesOrdenados = Object.keys(m.porMes).sort();
+  const mesesOrdenados = Object.keys(m.porMes).sort().reverse();
   const fmtMes = mk => { const [ano,mes] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(mes,10)-1]||mes) + '/' + ano.slice(2); };
   const tabelaMensal = mesesOrdenados.length ? `
     <div class="mgd-titulo-secao">Comparativo entre meses (agrupado pelo mês de lançamento de cada campanha)</div>
@@ -9839,8 +9876,8 @@ function renderTaxaValidacao() {
       <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);">
-            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">KPI</th>
-            ${mesesOrdenados.map(mk => `<th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">${esc(fmtMes(mk))}</th>`).join('')}
+            <th style="text-align:left;padding:7px 12px;color:#c9c6be;font-weight:500;">KPI</th>
+            ${mesesOrdenados.map(mk => `<th style="text-align:right;padding:7px 12px;color:#c9c6be;font-weight:500;">${esc(fmtMes(mk))}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -9862,7 +9899,7 @@ function renderTaxaValidacao() {
           </tr>
           <tr>
             <td style="padding:7px 12px;">Custo/Campeão</td>
-            ${mesesOrdenados.map(mk => { const d=m.porMes[mk]; const custo = d.campeoes>0 ? d.gastoTotal/d.campeoes : null; return `<td style="padding:7px 12px;text-align:right;">${custo!=null ? 'R$ '+fmtR(custo) : '—'}</td>`; }).join('')}
+            ${mesesOrdenados.map(mk => { const d=m.porMes[mk]; const custo = d.campeoes>0 ? d.gastoTotal/d.campeoes : null; return `<td style="padding:7px 12px;text-align:right;">${custo!=null ? 'R$ '+_mgdFmtBRL(custo) : '—'}</td>`; }).join('')}
           </tr>
         </tbody>
       </table>
@@ -9874,13 +9911,13 @@ function renderTaxaValidacao() {
       <table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);">
-            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">#</th>
-            <th style="text-align:left;padding:7px 12px;color:var(--muted);font-weight:500;">Campanha</th>
-            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">ROAS médio</th>
-            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Lucro gerado</th>
-            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Receita gerada</th>
-            <th style="text-align:right;padding:7px 12px;color:var(--muted);font-weight:500;">Dias em escala</th>
-            <th style="text-align:center;padding:7px 12px;color:var(--muted);font-weight:500;">Status</th>
+            <th style="text-align:left;padding:7px 12px;color:#c9c6be;font-weight:500;">#</th>
+            <th style="text-align:left;padding:7px 12px;color:#c9c6be;font-weight:500;">Campanha</th>
+            <th style="text-align:right;padding:7px 12px;color:#c9c6be;font-weight:500;">ROAS médio</th>
+            <th style="text-align:right;padding:7px 12px;color:#c9c6be;font-weight:500;">Lucro gerado</th>
+            <th style="text-align:right;padding:7px 12px;color:#c9c6be;font-weight:500;">Receita gerada</th>
+            <th style="text-align:right;padding:7px 12px;color:#c9c6be;font-weight:500;">Dias em escala</th>
+            <th style="text-align:center;padding:7px 12px;color:#c9c6be;font-weight:500;">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -9888,8 +9925,8 @@ function renderTaxaValidacao() {
             <td style="padding:7px 12px;">${i+1}</td>
             <td style="padding:7px 12px;">${esc(c.sid)}</td>
             <td style="padding:7px 12px;text-align:right;color:var(--green);font-weight:600;">${fmtR(c.roasMedio)}</td>
-            <td style="padding:7px 12px;text-align:right;color:${c.lucroGerado>=0?'var(--green)':'var(--red)'};">R$ ${fmtR(c.lucroGerado)}</td>
-            <td style="padding:7px 12px;text-align:right;">R$ ${fmtR(c.receitaGerada)}</td>
+            <td style="padding:7px 12px;text-align:right;color:${c.lucroGerado>=0?'var(--green)':'var(--red)'};">R$ ${_mgdFmtBRL(c.lucroGerado)}</td>
+            <td style="padding:7px 12px;text-align:right;">R$ ${_mgdFmtBRL(c.receitaGerada)}</td>
             <td style="padding:7px 12px;text-align:right;">${c.diasEmEscala}</td>
             <td style="padding:7px 12px;text-align:center;"><span class="badge ${c.status==='Campeão'?'b-camp':'b-bom'}" style="font-size:10px;">${esc(c.status)}</span></td>
           </tr>`).join('')}
@@ -9913,7 +9950,7 @@ function renderTaxaValidacao() {
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Custo médio p/ validar</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoMedio!=null ? 'R$ '+fmtR(m.custoMedio) : '—'}</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoMedio!=null ? 'R$ '+_mgdFmtBRL(m.custoMedio) : '—'}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Taxa de mortalidade</div>
@@ -10047,7 +10084,7 @@ function renderFunilOperacao() {
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Custo por campeão</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoPorCampeao!=null ? 'R$ '+fmtR(m.custoPorCampeao) : '—'}</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${m.custoPorCampeao!=null ? 'R$ '+_mgdFmtBRL(m.custoPorCampeao) : '—'}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">ROI dos testes</div>
@@ -10264,6 +10301,222 @@ function _mgdRenderDetalhe() {
     <div class="mgd-titulo-secao">Por que esse veredito</div>
     <div style="font-size:13px;line-height:1.6;">${esc(info.motivo || '—')}</div>
   `;
+}
+
+// ═══════════════════════════════════════════
+// VENDAS DIRETAS VS COOKIE
+// "Venda_Direta" vem direto da coluna "Tipo de atribuição" do relatório da
+// Shopee (mesma loja/mesmo produto = direta; loja diferente = cookie) — não
+// é estimativa, é o que a própria Shopee já classifica em cada pedido.
+// ═══════════════════════════════════════════
+let vcPeriodo = '30d';
+
+function setVendasCookiePeriodo(p, btn) {
+  vcPeriodo = p;
+  document.querySelectorAll('#vc-p-30d,#vc-p-mes,#vc-p-ano,#vc-p-max').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderVendasCookie();
+}
+
+function _vcIntervaloDatas() {
+  const hoje = new Date();
+  const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  let de;
+  if (vcPeriodo === 'ano') de = fmt(new Date(hoje.getFullYear(), 0, 1));
+  else if (vcPeriodo === 'mes') de = fmt(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+  else if (vcPeriodo === 'max') de = '2020-01-01';
+  else { const d = new Date(hoje); d.setDate(d.getDate()-29); de = fmt(d); }
+  return { de, ate: fmt(hoje) };
+}
+
+function _vendasDiretasVsCookie(de, ate) {
+  let totais=0, diretas=0, cookie=0;
+  let comDireta=0, comCookie=0, vendaDireta=0, vendaCookie=0;
+  const porProdutoDireta = {}, porProdutoCookie = {};
+  const porCampanha = {};
+
+  for (const r of DADOS) {
+    if (r.Plataforma !== 'shopee') continue;
+    if (!r.Order_ID) continue; // ignora linhas de clique (sem pedido)
+    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
+    const dt = normData(r.Data);
+    if (!dt || dt < de || dt > ate) continue;
+
+    totais++;
+    const isDireta = Number(r.Venda_Direta) > 0;
+    const com   = Number(r.Comissao)    || 0;
+    const venda = Number(r.Venda_Total) || 0;
+    const nome  = r.Nome_Item || 'Sem nome';
+    const sid   = r.Sub_ID || 'sem sub_id';
+
+    if (!porCampanha[sid]) porCampanha[sid] = { direta: 0, cookie: 0 };
+
+    if (isDireta) {
+      diretas++; comDireta += com; vendaDireta += venda;
+      if (!porProdutoDireta[nome]) porProdutoDireta[nome] = { qtd: 0, com: 0 };
+      porProdutoDireta[nome].qtd++; porProdutoDireta[nome].com += com;
+      porCampanha[sid].direta++;
+    } else {
+      cookie++; comCookie += com; vendaCookie += venda;
+      if (!porProdutoCookie[nome]) porProdutoCookie[nome] = { qtd: 0, com: 0 };
+      porProdutoCookie[nome].qtd++; porProdutoCookie[nome].com += com;
+      porCampanha[sid].cookie++;
+    }
+  }
+
+  const topN = (mapa) => Object.entries(mapa).map(([nome, d]) => ({ nome, ...d })).sort((a,b) => b.qtd - a.qtd).slice(0, 10);
+  const rankCampanhaCookie = Object.entries(porCampanha)
+    .map(([sid, d]) => ({ sid, cookie: d.cookie, total: d.direta + d.cookie, pct: (d.direta+d.cookie) > 0 ? d.cookie/(d.direta+d.cookie)*100 : 0 }))
+    .filter(x => x.total >= 3) // amostra mínima — evita destacar 1 venda isolada como "100% cookie"
+    .sort((a,b) => b.cookie - a.cookie).slice(0, 10);
+
+  return {
+    totais, diretas, cookie,
+    pctDiretas: totais > 0 ? diretas/totais*100 : 0,
+    pctCookie:  totais > 0 ? cookie/totais*100 : 0,
+    comDireta, comCookie,
+    ticketDireto: diretas > 0 ? vendaDireta/diretas : null,
+    ticketCookie: cookie  > 0 ? vendaCookie/cookie  : null,
+    rankProdutoDireta: topN(porProdutoDireta),
+    rankProdutoCookie: topN(porProdutoCookie),
+    rankCampanhaCookie,
+  };
+}
+
+// Cookie de verdade — tempo entre o clique ("Tempo dos Cliques") e a compra
+// ("Horário do pedido"). Diferente do painel de "Tipo de atribuição" acima
+// (que mede produto igual/diferente, não tempo). Só existe pra pedidos
+// importados depois que essa coluna passou a ser lida — pedidos antigos já
+// salvos no Supabase não têm esse dado.
+function _vendasPorAtrasoClique(de, ate) {
+  let comDado = 0, semDado = 0;
+  let imediata = 0, mesmoDia = 0, ateSeteDias = 0, maisDeSeteDias = 0;
+  let comImediata = 0, comCookieTempo = 0;
+
+  for (const r of DADOS) {
+    if (r.Plataforma !== 'shopee') continue;
+    if (!r.Order_ID) continue;
+    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
+    const dt = normData(r.Data);
+    if (!dt || dt < de || dt > ate) continue;
+
+    const atraso = r.Atraso_Clique_Horas;
+    if (atraso == null) { semDado++; continue; }
+    comDado++;
+    const com = Number(r.Comissao) || 0;
+
+    if (atraso <= 1)       { imediata++;       comImediata    += com; }
+    else if (atraso <= 24) { mesmoDia++;       comCookieTempo += com; }
+    else if (atraso <= 168){ ateSeteDias++;    comCookieTempo += com; }
+    else                   { maisDeSeteDias++; comCookieTempo += com; }
+  }
+
+  const totalCookieTempo = mesmoDia + ateSeteDias + maisDeSeteDias;
+  return { comDado, semDado, imediata, mesmoDia, ateSeteDias, maisDeSeteDias, totalCookieTempo, comImediata, comCookieTempo };
+}
+
+function renderVendasCookie() {
+  const el = document.getElementById('vc-conteudo');
+  if (!el) return;
+  const { de, ate } = _vcIntervaloDatas();
+  const d = _vendasDiretasVsCookie(de, ate);
+  const fmtPct = v => v.toFixed(1).replace('.', ',') + '%';
+
+  if (!d.totais) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhuma venda concluída/pendente nesse período.</div>';
+    return;
+  }
+
+  const rankHtml = (titulo, lista, mostrarValor) => `
+    <div class="mgd-titulo-secao">${esc(titulo)}</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      ${lista.length ? lista.map((x,i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;${i<lista.length-1?'border-bottom:1px solid var(--border);':''}">
+          <span style="font-size:12px;">${i+1}. ${esc(x.nome || x.sid)}</span>
+          <span style="font-size:12px;color:var(--muted);">${mostrarValor(x)}</span>
+        </div>`).join('') : '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">Sem dados suficientes.</div>'}
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Vendas totais</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${d.totais}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Vendas diretas</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:var(--green);">${d.diretas} (${fmtPct(d.pctDiretas)})</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Vendas por cookie</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:#b45309;">${d.cookie} (${fmtPct(d.pctCookie)})</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Comissão direta / cookie</div>
+        <div style="font-size:15px;font-weight:600;margin-top:2px;">R$ ${_mgdFmtBRL(d.comDireta)} / R$ ${_mgdFmtBRL(d.comCookie)}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Ticket médio — venda direta</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${d.ticketDireto!=null ? 'R$ '+_mgdFmtBRL(d.ticketDireto) : '—'}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Ticket médio — venda cookie</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;">${d.ticketCookie!=null ? 'R$ '+_mgdFmtBRL(d.ticketCookie) : '—'}</div>
+      </div>
+    </div>
+    ${rankHtml('Produtos que mais vendem direto', d.rankProdutoDireta, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
+    ${rankHtml('Produtos que mais vendem por cookie', d.rankProdutoCookie, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
+    ${rankHtml('Campanhas que mais levam gente pra dentro da Shopee (venda cookie)', d.rankCampanhaCookie, x => `${x.cookie}/${x.total} vendas · ${fmtPct(x.pct)} cookie`)}
+    ${_renderVendasPorTempo(de, ate)}
+  `;
+}
+
+function _renderVendasPorTempo(de, ate) {
+  const fmtPct2 = v => v.toFixed(1).replace('.', ',') + '%';
+  const t = _vendasPorAtrasoClique(de, ate);
+
+  if (!t.comDado) {
+    return `
+      <div class="mgd-titulo-secao">Cookie por tempo (clique → compra)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Nenhum pedido nesse período tem o horário do clique registrado ainda — essa coluna só passou a ser lida agora.
+        Assim que você importar CSVs novos da Shopee, esse painel passa a preencher (pedidos já importados antes não têm esse dado retroativamente).
+      </div>`;
+  }
+
+  const totalComDado = t.comDado;
+  return `
+    <div class="mgd-titulo-secao">Cookie por tempo (clique → compra) <span style="font-weight:400;text-transform:none;">— ${totalComDado} pedido(s) com esse dado${t.semDado ? ', ' + t.semDado + ' sem dado' : ''}</span></div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
+        <span style="font-size:12px;">Compra na mesma hora (até 1h)</span>
+        <span style="font-size:12px;color:var(--muted);">${t.imediata} (${fmtPct2(t.imediata/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comImediata)}</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
+        <span style="font-size:12px;">Mesmo dia, depois de 1h</span>
+        <span style="font-size:12px;color:var(--muted);">${t.mesmoDia} (${fmtPct2(t.mesmoDia/totalComDado*100)})</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
+        <span style="font-size:12px;">1 a 7 dias depois (dentro da janela do cookie)</span>
+        <span style="font-size:12px;color:var(--muted);">${t.ateSeteDias} (${fmtPct2(t.ateSeteDias/totalComDado*100)})</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;">
+        <span style="font-size:12px;">Mais de 7 dias (fora da janela oficial — raro/dado a checar)</span>
+        <span style="font-size:12px;color:var(--muted);">${t.maisDeSeteDias} (${fmtPct2(t.maisDeSeteDias/totalComDado*100)})</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Total vendido por cookie de tempo (compra depois de 1h+)</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:#b45309;">${t.totalCookieTempo} (${fmtPct2(t.totalCookieTempo/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comCookieTempo)}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">Total comprado na hora</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:var(--green);">${t.imediata} (${fmtPct2(t.imediata/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comImediata)}</div>
+      </div>
+    </div>`;
 }
 
 // Selo "D12" pra usar perto do nome da campanha (fase atual, baseada em hoje)
@@ -10798,6 +11051,7 @@ async function renderPedidos() {
       <td style="text-align:center;font-size:11px;">${linkDisplay}</td>
       <td style="text-align:right;font-weight:600;color:var(--green);">${r2(r.Comissao)}</td>
       <td style="text-align:right;font-size:12px;">${r2(r.Venda_Total)}</td>
+      <td style="text-align:center;">${Number(r.Venda_Direta) > 0 ? '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:var(--green-bg);color:var(--green);">Direta</span>' : '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:var(--bg3);color:var(--muted);">Indireta</span>'}</td>
       <td style="text-align:left;font-size:11px;">
         <span style="display:flex;align-items:center;gap:5px;min-width:0;">
           <strong style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.Sub_ID || '—')}</strong>
@@ -10813,7 +11067,7 @@ async function renderPedidos() {
     </tr>`;
   }).join('');
 
-  document.getElementById('pedidos-body').innerHTML = html || '<tr><td colspan="10" class="empty">Nenhum pedido nesta data</td></tr>';
+  document.getElementById('pedidos-body').innerHTML = html || '<tr><td colspan="11" class="empty">Nenhum pedido nesta data</td></tr>';
   _pedidosAtualizarBarraSelecao();
 }
 
@@ -10917,7 +11171,7 @@ function renderMensal() {
     </tr>
     <tr class="mensal-head-row2">
       <th style="position:sticky;left:0;z-index:14;background:var(--bg3);border-top:1px solid var(--border);"></th>
-      ${resultadoOculto ? '' : `<th style="text-align:right;font-size:10px;font-weight:700;color:var(--muted);position:sticky;z-index:14;background:var(--bg3);border-left:3px solid var(--border);border-right:3px solid var(--border);border-top:1px solid var(--border);">Total Geral</th>`}
+      ${resultadoOculto ? '' : `<th style="text-align:right;font-size:10px;font-weight:700;color:#c9c6be;position:sticky;z-index:14;background:var(--bg3);border-left:3px solid var(--border);border-right:3px solid var(--border);border-top:1px solid var(--border);">Total Geral</th>`}
       ${colunas.map((c,i) => {
         const primeiraDoGrupo = i===0 || colunas[i-1].op !== c.op;
         // Logo após a coluna "Total" da operação: borda sólida (separa Total das plataformas).

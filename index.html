@@ -732,6 +732,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
      PÁGINA: VENDAS DIRETAS VS COOKIE
 ══════════════════════════════════════════ -->
 <div class="page" id="page-vendas-cookie">
+  <div id="vc-mensal" style="margin-bottom:20px;"></div>
   <div class="period-btns" style="margin-bottom:16px;">
     <button class="period-btn active" id="vc-p-30d" onclick="setVendasCookiePeriodo('30d',this)">30 dias</button>
     <button class="period-btn"        id="vc-p-mes" onclick="setVendasCookiePeriodo('mes',this)">Este mês</button>
@@ -7216,7 +7217,7 @@ function renderNavAbas() {
         : a.id === 'analise-mgd'
         ? "showPage('analise-mgd',this);renderAnaliseMGD()"
         : a.id === 'vendas-cookie'
-        ? "showPage('vendas-cookie',this);renderVendasCookie()"
+        ? "showPage('vendas-cookie',this);renderVendasCookieMensal();renderVendasCookie()"
         : `showPage('${a.id}',this)`,
     })),
   ];
@@ -10355,6 +10356,87 @@ function _mgdRenderDetalhe() {
 // é estimativa, é o que a própria Shopee já classifica em cada pedido.
 // ═══════════════════════════════════════════
 let vcPeriodo = '30d';
+let _vcMesExpandido = null; // qual mês está expandido no bloco do topo
+
+// Agrupa pedidos (diretos/cookie) por mês e, dentro de cada mês, por dia —
+// alimenta o bloco expansível do topo da aba, independente do filtro de
+// período abaixo (esse é sempre "tudo que já foi carregado").
+function _vendasPorMesEDia() {
+  const porMes = {};
+  for (const r of DADOS) {
+    if (r.Plataforma !== 'shopee') continue;
+    if (!r.Order_ID) continue;
+    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
+    const dt = normData(r.Data);
+    if (!dt) continue;
+    const mesKey = dt.slice(0, 7);
+    if (!porMes[mesKey]) porMes[mesKey] = { diretas: 0, cookie: 0, comDireta: 0, comCookie: 0, porDia: {} };
+    if (!porMes[mesKey].porDia[dt]) porMes[mesKey].porDia[dt] = { diretas: 0, cookie: 0, comDireta: 0, comCookie: 0 };
+    const isDireta = Number(r.Venda_Direta) > 0;
+    const com = Number(r.Comissao) || 0;
+    if (isDireta) {
+      porMes[mesKey].diretas++; porMes[mesKey].comDireta += com;
+      porMes[mesKey].porDia[dt].diretas++; porMes[mesKey].porDia[dt].comDireta += com;
+    } else {
+      porMes[mesKey].cookie++; porMes[mesKey].comCookie += com;
+      porMes[mesKey].porDia[dt].cookie++; porMes[mesKey].porDia[dt].comCookie += com;
+    }
+  }
+  return porMes;
+}
+
+function _vcToggleMes(mesKey) {
+  _vcMesExpandido = _vcMesExpandido === mesKey ? null : mesKey;
+  renderVendasCookieMensal();
+}
+
+function renderVendasCookieMensal() {
+  const el = document.getElementById('vc-mensal');
+  if (!el) return;
+  const porMes = _vendasPorMesEDia();
+  const mesesOrdenados = Object.keys(porMes).sort().reverse();
+  const fmtMesVc = mk => { const [ano,mes] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(mes,10)-1]||mes) + '/' + ano.slice(2); };
+
+  if (!mesesOrdenados.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Sem pedidos carregados ainda.</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="mgd-titulo-secao">Diretas x Cookie por mês</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      ${mesesOrdenados.map((mk, i) => {
+        const dm = porMes[mk];
+        const total = dm.diretas + dm.cookie;
+        const pctCookie = total > 0 ? (dm.cookie/total*100) : 0;
+        const expandido = _vcMesExpandido === mk;
+        const diasOrdenados = Object.keys(dm.porDia).sort().reverse();
+        return `
+        <div onclick="_vcToggleMes('${mk}')"
+          style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;${i<mesesOrdenados.length-1||expandido?'border-bottom:1px solid var(--border);':''}">
+          <span style="font-size:10px;width:10px;">${expandido?'▼':'▶'}</span>
+          <span style="font-size:12px;font-weight:600;width:60px;flex-shrink:0;">${esc(fmtMesVc(mk))}</span>
+          <span style="font-size:12px;color:var(--green);">${dm.diretas} direta(s)</span>
+          <span style="font-size:12px;color:#b45309;">${dm.cookie} cookie (${pctCookie.toFixed(1).replace('.',',')}%)</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:auto;">${total} pedido(s) · R$ ${_mgdFmtBRL(dm.comDireta+dm.comCookie)}</span>
+        </div>
+        ${expandido ? `<div style="padding:6px 12px 12px 32px;background:var(--bg);${i<mesesOrdenados.length-1?'border-bottom:1px solid var(--border);':''}">
+          ${diasOrdenados.map(dia => {
+            const dd = dm.porDia[dia];
+            const totalDia = dd.diretas + dd.cookie;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;background:var(--bg2);border-radius:6px;margin-top:4px;flex-wrap:wrap;">
+              <span style="font-size:11px;font-weight:600;width:75px;flex-shrink:0;">${fmtDataBR(dia)}</span>
+              <span style="font-size:11px;color:var(--green);">${dd.diretas} direta(s)</span>
+              <span style="font-size:11px;color:#b45309;">${dd.cookie} cookie</span>
+              <span style="font-size:11px;color:var(--muted);margin-left:auto;">${totalDia} pedido(s) · R$ ${_mgdFmtBRL(dd.comDireta+dd.comCookie)}</span>
+            </div>`;
+          }).join('')}
+        </div>` : ''}`;
+      }).join('')}
+    </div>`;
+}
+
+
 
 function setVendasCookiePeriodo(p, btn) {
   vcPeriodo = p;

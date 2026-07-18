@@ -10357,23 +10357,26 @@ function _mgdRenderDetalhe() {
 // ═══════════════════════════════════════════
 let vcPeriodo = '30d';
 let _vcMesSelecionado = null; // mês ativo no seletor de pílulas
+let _vcMesExplodido = false;  // lista de dias visível? (recolhida por padrão)
 let _vcDiaExpandido = null;   // dia expandido mostrando os pedidos individuais
 
-// Agrupa pedidos (diretos/cookie, por "Tipo de atribuição") por mês e por
-// dia, guardando também a lista de pedidos individuais de cada dia — pra
-// poder abrir até o nível de pedido.
+// Agrupa pedidos (diretos/cookie, por tempo entre clique e compra) por mês e
+// por dia, guardando também a lista de pedidos individuais de cada dia — pra
+// poder abrir até o nível de pedido. Pedidos sem "Tempo dos Cliques" ficam
+// de fora (não dá pra classificar sem esse dado).
 function _vendasPorMesEDia() {
   const porMes = {};
   for (const r of DADOS) {
     if (r.Plataforma !== 'shopee') continue;
     if (!r.Order_ID) continue;
     if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
+    if (r.Atraso_Clique_Horas == null) continue;
     const dt = normData(r.Data);
     if (!dt) continue;
     const mesKey = dt.slice(0, 7);
     if (!porMes[mesKey]) porMes[mesKey] = { diretas: 0, cookie: 0, comDireta: 0, comCookie: 0, porDia: {} };
     if (!porMes[mesKey].porDia[dt]) porMes[mesKey].porDia[dt] = { diretas: 0, cookie: 0, comDireta: 0, comCookie: 0, pedidos: [] };
-    const isDireta = Number(r.Venda_Direta) > 0;
+    const isDireta = r.Atraso_Clique_Horas <= 1;
     const com = Number(r.Comissao) || 0;
     porMes[mesKey].porDia[dt].pedidos.push({ nome: r.Nome_Item || 'Sem nome', sid: r.Sub_ID || '', com, isDireta });
     if (isDireta) {
@@ -10389,7 +10392,14 @@ function _vendasPorMesEDia() {
 
 function _vcSelecionarMes(mesKey) {
   _vcMesSelecionado = mesKey;
+  _vcMesExplodido = false;
   _vcDiaExpandido = null;
+  renderVendasCookieMensal();
+}
+
+function _vcToggleExplodirMes() {
+  _vcMesExplodido = !_vcMesExplodido;
+  if (!_vcMesExplodido) _vcDiaExpandido = null;
   renderVendasCookieMensal();
 }
 
@@ -10434,7 +10444,7 @@ function renderVendasCookieMensal() {
   const diasOrdenados = Object.keys(dm.porDia).sort().reverse();
 
   el.innerHTML = `
-    <div class="mgd-titulo-secao">Diretas x Cookie por mês <span style="font-weight:400;text-transform:none;">— por tipo de atribuição (mesmo produto/loja diferente)</span></div>
+    <div class="mgd-titulo-secao">Diretas x Cookie por mês <span style="font-weight:400;text-transform:none;">— compra no mesmo tempo do clique ou depois (cookie)</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       ${mesesOrdenados.map(mk => `<button onclick="_vcSelecionarMes('${mk}')"
         style="padding:6px 14px;border-radius:16px;border:1px solid ${mk===_vcMesSelecionado?'#2563eb':'var(--border)'};background:${mk===_vcMesSelecionado?'var(--blue-bg)':'var(--bg2)'};font-size:12px;font-weight:${mk===_vcMesSelecionado?'700':'400'};color:${mk===_vcMesSelecionado?'#1d4ed8':'var(--text)'};cursor:pointer;">${esc(fmtMesVc(mk))}</button>`).join('')}
@@ -10453,6 +10463,11 @@ function renderVendasCookieMensal() {
         <div style="font-size:18px;font-weight:600;margin-top:2px;color:#b45309;">${dm.cookie}</div>
       </div>
     </div>
+    <button onclick="_vcToggleExplodirMes()"
+      style="font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);cursor:pointer;margin-bottom:${_vcMesExplodido?'8px':'0'};">
+      ${_vcMesExplodido ? '▲ Esconder dias' : '▶ Ver dias de ' + esc(fmtMesVc(_vcMesSelecionado))}
+    </button>
+    ${_vcMesExplodido ? `
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       ${diasOrdenados.map((dia, i) => {
         const dd = dm.porDia[dia];
@@ -10469,7 +10484,7 @@ function renderVendasCookieMensal() {
         </div>
         ${expandido ? _renderListaPedidosDia(dd.pedidos, 'isDireta', 'Diretos', 'var(--green)', 'Cookie', '#b45309', i<diasOrdenados.length-1) : ''}`;
       }).join('')}
-    </div>`;
+    </div>` : ''}`;
 }
 
 
@@ -10492,8 +10507,13 @@ function _vcIntervaloDatas() {
   return { de, ate: fmt(hoje) };
 }
 
+// Direta = comprou no mesmo tempo do clique (até 1h depois). Cookie = comprou
+// depois disso (dentro da janela de 7 dias do cookie da Shopee, ou mais).
+// Baseado em "Tempo dos Cliques" x "Horário do pedido" — pedidos sem esse
+// dado (importados antes dessa coluna existir) ficam de fora da contagem,
+// mostrados à parte como "sem dado".
 function _vendasDiretasVsCookie(de, ate) {
-  let totais=0, diretas=0, cookie=0;
+  let totais=0, diretas=0, cookie=0, semDado=0;
   let comDireta=0, comCookie=0, vendaDireta=0, vendaCookie=0;
   const porProdutoDireta = {}, porProdutoCookie = {};
   const porCampanha = {};
@@ -10505,8 +10525,10 @@ function _vendasDiretasVsCookie(de, ate) {
     const dt = normData(r.Data);
     if (!dt || dt < de || dt > ate) continue;
 
+    if (r.Atraso_Clique_Horas == null) { semDado++; continue; }
+
     totais++;
-    const isDireta = Number(r.Venda_Direta) > 0;
+    const isDireta = r.Atraso_Clique_Horas <= 1;
     const com   = Number(r.Comissao)    || 0;
     const venda = Number(r.Venda_Total) || 0;
     const nome  = r.Nome_Item || 'Sem nome';
@@ -10534,7 +10556,7 @@ function _vendasDiretasVsCookie(de, ate) {
     .sort((a,b) => b.cookie - a.cookie).slice(0, 10);
 
   return {
-    totais, diretas, cookie,
+    totais, diretas, cookie, semDado,
     pctDiretas: totais > 0 ? diretas/totais*100 : 0,
     pctCookie:  totais > 0 ? cookie/totais*100 : 0,
     comDireta, comCookie,
@@ -10546,67 +10568,6 @@ function _vendasDiretasVsCookie(de, ate) {
   };
 }
 
-// Cookie de verdade — tempo entre o clique ("Tempo dos Cliques") e a compra
-// ("Horário do pedido"). Diferente do painel de "Tipo de atribuição" acima
-// (que mede produto igual/diferente, não tempo). Só existe pra pedidos
-// importados depois que essa coluna passou a ser lida — pedidos antigos já
-// salvos no Supabase não têm esse dado.
-let _vcDiaTempoExpandido = null; // dia expandido no painel "Cookie por tempo"
-
-// Mesma ideia do painel de mês, mas pro eixo de tempo (clique → compra):
-// agrupa por dia, guardando os pedidos individuais de cada um.
-function _vendasPorTempoPorDia(de, ate) {
-  const porDia = {};
-  for (const r of DADOS) {
-    if (r.Plataforma !== 'shopee') continue;
-    if (!r.Order_ID) continue;
-    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
-    const dt = normData(r.Data);
-    if (!dt || dt < de || dt > ate) continue;
-    const atraso = r.Atraso_Clique_Horas;
-    if (atraso == null) continue;
-    if (!porDia[dt]) porDia[dt] = { imediata: 0, cookieTempo: 0, comImediata: 0, comCookieTempo: 0, pedidos: [] };
-    const com = Number(r.Comissao) || 0;
-    const isImediata = atraso <= 1;
-    porDia[dt].pedidos.push({ nome: r.Nome_Item || 'Sem nome', sid: r.Sub_ID || '', com, atraso, isImediata });
-    if (isImediata) { porDia[dt].imediata++; porDia[dt].comImediata += com; }
-    else { porDia[dt].cookieTempo++; porDia[dt].comCookieTempo += com; }
-  }
-  return porDia;
-}
-
-function _vcToggleDiaTempo(dia) {
-  _vcDiaTempoExpandido = _vcDiaTempoExpandido === dia ? null : dia;
-  renderVendasCookie();
-}
-
-function _vendasPorAtrasoClique(de, ate) {
-  let comDado = 0, semDado = 0;
-  let imediata = 0, mesmoDia = 0, ateSeteDias = 0, maisDeSeteDias = 0;
-  let comImediata = 0, comCookieTempo = 0;
-
-  for (const r of DADOS) {
-    if (r.Plataforma !== 'shopee') continue;
-    if (!r.Order_ID) continue;
-    if (r.Status !== 'PENDING' && r.Status !== 'COMPLETED') continue;
-    const dt = normData(r.Data);
-    if (!dt || dt < de || dt > ate) continue;
-
-    const atraso = r.Atraso_Clique_Horas;
-    if (atraso == null) { semDado++; continue; }
-    comDado++;
-    const com = Number(r.Comissao) || 0;
-
-    if (atraso <= 1)       { imediata++;       comImediata    += com; }
-    else if (atraso <= 24) { mesmoDia++;       comCookieTempo += com; }
-    else if (atraso <= 168){ ateSeteDias++;    comCookieTempo += com; }
-    else                   { maisDeSeteDias++; comCookieTempo += com; }
-  }
-
-  const totalCookieTempo = mesmoDia + ateSeteDias + maisDeSeteDias;
-  return { comDado, semDado, imediata, mesmoDia, ateSeteDias, maisDeSeteDias, totalCookieTempo, comImediata, comCookieTempo };
-}
-
 function renderVendasCookie() {
   const el = document.getElementById('vc-conteudo');
   if (!el) return;
@@ -10615,7 +10576,7 @@ function renderVendasCookie() {
   const fmtPct = v => v.toFixed(1).replace('.', ',') + '%';
 
   if (!d.totais) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhuma venda concluída/pendente nesse período.</div>';
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);">Nenhum pedido com horário de clique registrado nesse período${d.semDado ? ' ('+d.semDado+' pedido(s) sem esse dado — importados antes dessa coluna existir)' : ''}.</div>`;
     return;
   }
 
@@ -10630,17 +10591,18 @@ function renderVendasCookie() {
     </div>`;
 
   el.innerHTML = `
+    ${d.semDado ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">${d.semDado} pedido(s) desse período sem horário de clique registrado — não entram nessa conta.</div>` : ''}
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Vendas totais</div>
         <div style="font-size:18px;font-weight:600;margin-top:2px;">${d.totais}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">Vendas diretas</div>
+        <div style="font-size:11px;color:var(--muted);">Vendas diretas (na hora)</div>
         <div style="font-size:18px;font-weight:600;margin-top:2px;color:var(--green);">${d.diretas} (${fmtPct(d.pctDiretas)})</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">Vendas por cookie</div>
+        <div style="font-size:11px;color:var(--muted);">Vendas por cookie (depois)</div>
         <div style="font-size:18px;font-weight:600;margin-top:2px;color:#b45309;">${d.cookie} (${fmtPct(d.pctCookie)})</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
@@ -10658,83 +10620,10 @@ function renderVendasCookie() {
         <div style="font-size:18px;font-weight:600;margin-top:2px;">${d.ticketCookie!=null ? 'R$ '+_mgdFmtBRL(d.ticketCookie) : '—'}</div>
       </div>
     </div>
-    ${rankHtml('Produtos que mais vendem direto', d.rankProdutoDireta, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
-    ${rankHtml('Produtos que mais vendem por cookie', d.rankProdutoCookie, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
-    ${rankHtml('Campanhas que mais levam gente pra dentro da Shopee (venda cookie)', d.rankCampanhaCookie, x => `${x.cookie}/${x.total} vendas · ${fmtPct(x.pct)} cookie`)}
-    ${_renderVendasPorTempo(de, ate)}
+    ${rankHtml('Produtos que mais vendem direto (na hora)', d.rankProdutoDireta, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
+    ${rankHtml('Produtos que mais vendem por cookie (depois)', d.rankProdutoCookie, x => `${x.qtd} venda(s) · R$ ${_mgdFmtBRL(x.com)}`)}
+    ${rankHtml('Campanhas que mais geram venda por cookie', d.rankCampanhaCookie, x => `${x.cookie}/${x.total} vendas · ${fmtPct(x.pct)} cookie`)}
   `;
-}
-
-function _renderVendasPorTempo(de, ate) {
-  const fmtPct2 = v => v.toFixed(1).replace('.', ',') + '%';
-  const t = _vendasPorAtrasoClique(de, ate);
-
-  if (!t.comDado) {
-    return `
-      <div class="mgd-titulo-secao">Cookie por tempo (clique → compra)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
-        Nenhum pedido nesse período tem o horário do clique registrado ainda — essa coluna só passou a ser lida agora.
-        Assim que você importar CSVs novos da Shopee, esse painel passa a preencher (pedidos já importados antes não têm esse dado retroativamente).
-      </div>`;
-  }
-
-  const totalComDado = t.comDado;
-  return `
-    <div class="mgd-titulo-secao">Cookie por tempo (clique → compra) <span style="font-weight:400;text-transform:none;">— ${totalComDado} pedido(s) com esse dado${t.semDado ? ', ' + t.semDado + ' sem dado' : ''}</span></div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
-        <span style="font-size:12px;">Compra na mesma hora (até 1h)</span>
-        <span style="font-size:12px;color:var(--muted);">${t.imediata} (${fmtPct2(t.imediata/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comImediata)}</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
-        <span style="font-size:12px;">Mesmo dia, depois de 1h</span>
-        <span style="font-size:12px;color:var(--muted);">${t.mesmoDia} (${fmtPct2(t.mesmoDia/totalComDado*100)})</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);">
-        <span style="font-size:12px;">1 a 7 dias depois (dentro da janela do cookie)</span>
-        <span style="font-size:12px;color:var(--muted);">${t.ateSeteDias} (${fmtPct2(t.ateSeteDias/totalComDado*100)})</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;">
-        <span style="font-size:12px;">Mais de 7 dias (fora da janela oficial — raro/dado a checar)</span>
-        <span style="font-size:12px;color:var(--muted);">${t.maisDeSeteDias} (${fmtPct2(t.maisDeSeteDias/totalComDado*100)})</span>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
-      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">Total vendido por cookie de tempo (compra depois de 1h+)</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;color:#b45309;">${t.totalCookieTempo} (${fmtPct2(t.totalCookieTempo/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comCookieTempo)}</div>
-      </div>
-      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:11px;color:var(--muted);">Total comprado na hora</div>
-        <div style="font-size:18px;font-weight:600;margin-top:2px;color:var(--green);">${t.imediata} (${fmtPct2(t.imediata/totalComDado*100)}) · R$ ${_mgdFmtBRL(t.comImediata)}</div>
-      </div>
-    </div>
-    ${_renderVendasPorTempoDias(de, ate)}`;
-}
-
-function _renderVendasPorTempoDias(de, ate) {
-  const porDia = _vendasPorTempoPorDia(de, ate);
-  const diasOrdenados = Object.keys(porDia).sort().reverse();
-  if (!diasOrdenados.length) return '';
-  return `
-    <div class="mgd-titulo-secao">Por dia — clique → compra</div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
-      ${diasOrdenados.map((dia, i) => {
-        const dd = porDia[dia];
-        const totalDia = dd.imediata + dd.cookieTempo;
-        const expandido = _vcDiaTempoExpandido === dia;
-        return `
-        <div onclick="_vcToggleDiaTempo('${dia}')"
-          style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;${i<diasOrdenados.length-1||expandido?'border-bottom:1px solid var(--border);':''}">
-          <span style="font-size:10px;width:10px;">${expandido?'▼':'▶'}</span>
-          <span style="font-size:12px;font-weight:600;width:70px;flex-shrink:0;">${fmtDataBR(dia)}</span>
-          <span style="font-size:12px;color:var(--green);">${dd.imediata} na hora</span>
-          <span style="font-size:12px;color:#b45309;">${dd.cookieTempo} cookie</span>
-          <span style="font-size:12px;color:var(--muted);margin-left:auto;">${totalDia} pedido(s) · R$ ${_mgdFmtBRL(dd.comImediata+dd.comCookieTempo)}</span>
-        </div>
-        ${expandido ? _renderListaPedidosDia(dd.pedidos, 'isImediata', 'Na hora', 'var(--green)', 'Cookie (tempo)', '#b45309', i<diasOrdenados.length-1) : ''}`;
-      }).join('')}
-    </div>`;
 }
 
 // Selo "D12" pra usar perto do nome da campanha (fase atual, baseada em hoje)

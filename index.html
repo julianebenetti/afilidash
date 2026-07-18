@@ -9449,6 +9449,21 @@ function _metricasDetalhadasDia(sid, dia) {
     return itens;
   }
   if (dia >= 5) {
+    // 1) ROAS do próprio dia — só a receita líquida ÷ gasto daquele dia
+    const md = m(dia);
+    if (md.gastoMeta > 0) {
+      const roasDia = (md.comissao - md.imposto) / md.gastoMeta;
+      itens.push({ label:'ROAS do dia', bom: roasDia>=MGD_BREAKEVEN, valor:`${fmtR(roasDia)}` });
+    } else {
+      itens.push({ label:'ROAS do dia', bom: false, valor:'— sem gasto no dia' });
+    }
+    // 2) ROAS médio dos últimos 7 dias terminando nesse dia — mesma janela
+    // que decide o veredito ATENÇÃO/MANTER pra campanhas D10+
+    let g7=0, c7=0, i7=0;
+    for (let k = dia-6; k <= dia; k++) { if (k < 0) continue; const mm = m(k); g7+=mm.gastoMeta; c7+=mm.comissao; i7+=mm.imposto; }
+    const roas7 = g7 > 0 ? (c7 - i7) / g7 : 0;
+    itens.push({ label:'ROAS médio (7 dias)', bom: roas7>=MGD_BREAKEVEN, valor: g7>0 ? `${fmtR(roas7)}` : '— sem gasto no período' });
+    // 3) ROAS acumulado desde o lançamento — D0 até esse dia
     const roasAc = roasAcumuladoAte(dia);
     itens.push({ label:'ROAS acumulado', bom: roasAc>=MGD_BREAKEVEN, valor:`${fmtR(roasAc)}` });
     return itens;
@@ -9478,6 +9493,30 @@ function _roasAcumuladoTotalCampanha(sid) {
     c += porDia[dt].comissao;
     i += porDia[dt].imposto;
   });
+  return g > 0 ? (c - i) / g : 0;
+}
+
+// ROAS médio dos últimos 7 dias — sempre em relação a HOJE (mesmo padrão da
+// _roasAcumuladoTotalCampanha: fixo, não muda ao clicar em dias diferentes
+// da linha do tempo). É a mesma janela que decide o veredito ATENÇÃO/MANTER
+// pra campanhas D10+ dentro de _analisarMGD, só que exposta separadamente
+// pra virar KPI no topo do painel.
+function _roas7DiasCampanha(sid) {
+  const d0 = _primeiraDataGasto(sid);
+  if (!d0) return 0;
+  const _h = new Date();
+  const hojeStr = _h.getFullYear() + '-' + String(_h.getMonth()+1).padStart(2,'0') + '-' + String(_h.getDate()).padStart(2,'0');
+  const diaHoje = Math.round((new Date(hojeStr+'T00:00:00') - new Date(d0+'T00:00:00')) / 86400000);
+  if (diaHoje < 0) return 0;
+  const porDia = _historicoDiarioCampanha(sid);
+  const vazio = { gastoMeta:0, comissao:0, imposto:0 };
+  const diaData = n => { const d = new Date(d0+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  let g=0, c=0, i=0;
+  for (let n = diaHoje-6; n <= diaHoje; n++) {
+    if (n < 0) continue;
+    const mm = porDia[diaData(n)] || vazio;
+    g += mm.gastoMeta; c += mm.comissao; i += mm.imposto;
+  }
   return g > 0 ? (c - i) / g : 0;
 }
 
@@ -10273,6 +10312,7 @@ function _mgdRenderDetalhe() {
   // regra daquele dia específico usou (que pra D10+ é janela de 7 dias, não
   // o acumulado total) continua visível no checklist "Métricas de Dxx" abaixo.
   const roasTotal = _roasAcumuladoTotalCampanha(sid);
+  const roas7Total = _roas7DiasCampanha(sid);
   const margemTotal = roasTotal - MGD_BREAKEVEN;
   const alertas = _mgdAlertasCampanha(sid);
 
@@ -10310,10 +10350,14 @@ function _mgdRenderDetalhe() {
       <span class="badge ${badgeCls}" style="font-size:12px;padding:6px 14px;">${esc(info.veredito||'—')}</span>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">ROAS acumulado (total, D0→hoje)</div>
         <div style="font-size:18px;font-weight:600;margin-top:2px;">${roasTotal.toFixed(2).replace('.',',')}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:var(--muted);">ROAS últimos 7 dias</div>
+        <div style="font-size:18px;font-weight:600;margin-top:2px;color:${roas7Total>=MGD_BREAKEVEN?'var(--green)':'var(--red)'};">${roas7Total.toFixed(2).replace('.',',')}</div>
       </div>
       <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
         <div style="font-size:11px;color:var(--muted);">Breakeven</div>

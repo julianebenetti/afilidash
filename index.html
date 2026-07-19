@@ -5432,12 +5432,21 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
   }
 
   // Busca os anúncios de cada campanha em paralelo — decide o nível (campanha x anúncio).
-  // SÓ pra campanhas ATIVAS: pausada/arquivada/excluída não está gastando, então não
-  // precisamos saber nível anúncio nem orçamento dela agora — isso reduz bastante o número
-  // de chamadas por sync (de "uma por campanha" pra "uma só pelas que estão rodando"),
-  // evitando o rate limit do Meta ("User request limit reached").
-  const adsPorCampanha = await Promise.all(campanhas.map(async c => {
-    if ((c.effective_status||'').toUpperCase() !== 'ACTIVE') return 'SKIP_INATIVA';
+  // Regra: SEMPRE checa campanhas ATIVAS (podem virar multi-anúncio a qualquer momento).
+  // Pausada/arquivada só é checada UMA VEZ, se ainda estiver classificada no nível campanha
+  // e nunca tiver sido conferida nesse estado — permite corrigir histórico de campanhas
+  // antigas que ganharam variações (vs1/vs2/vs3) depois de já pausadas, sem voltar a
+  // rechecar TODAS as pausadas a cada sync (o que estourava o rate limit do Meta antes).
+  // Depois da primeira checagem (achando 1 anúncio só mesmo), marca _verificadoPausada e
+  // nunca mais reconsulta essa campanha enquanto ela continuar pausada.
+  const precisaChecarAnuncios = campanhas.map(c => {
+    if ((c.effective_status||'').toUpperCase() === 'ACTIVE') return true;
+    const sidsDestaCampanha = Object.keys(CFG_CAMPANHAS).filter(s => CFG_CAMPANHAS[s].meta_campaign_id === c.id);
+    return sidsDestaCampanha.some(s => CFG_CAMPANHAS[s].meta_nivel === 'campanha' && !CFG_CAMPANHAS[s]._verificadoPausada);
+  });
+
+  const adsPorCampanha = await Promise.all(campanhas.map(async (c, i) => {
+    if (!precisaChecarAnuncios[i]) return 'SKIP_INATIVA';
     try {
       const adsUrl = `https://graph.facebook.com/v19.0/${c.id}/ads?fields=name,effective_status,adset_id,created_time,creative{id,object_story_spec,asset_feed_spec,call_to_action}&limit=500&access_token=${contaMeta.token}`;
       const adsRes = await fetch(adsUrl);
@@ -5557,6 +5566,11 @@ async function _buscarStatusOrcamentoMeta(contaMeta) {
         CFG_CAMPANHAS[sid].meta_adset_id     = ads[0]?.adset_id || null;
         CFG_CAMPANHAS[sid].meta_nivel        = 'campanha';
         CFG_CAMPANHAS[sid].effective_status  = c.effective_status;
+        // Flag de controle da checagem em pausadas (ver comentário acima do
+        // precisaChecarAnuncios): ativa limpa (fica pronta pra 1 nova checagem
+        // na próxima vez que for pausada); pausada marca como já conferida.
+        if ((c.effective_status||'').toUpperCase() === 'ACTIVE') delete CFG_CAMPANHAS[sid]._verificadoPausada;
+        else CFG_CAMPANHAS[sid]._verificadoPausada = true;
         // Auto-extrai o link do criativo — só sobrescreve se achou algo; nunca apaga um
         // link já salvo (manual ou de ciclo anterior) quando a extração não encontra nada.
         { const _linkExt = _extrairLinkCreative(ads[0]); if (_linkExt) CFG_CAMPANHAS[sid].link = _linkExt; }

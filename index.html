@@ -5271,6 +5271,15 @@ async function buscarPedidosShopee(conta) {
       const vendaTotal    = node.orders.reduce((s, o) =>
         s + o.items.reduce((si, i) => si + (Number(i.actualAmount)||0), 0), 0);
 
+      // Atraso entre clique e compra, em horas — mesma lógica do import de CSV
+      // (linha ~4926), só que aqui os timestamps já vêm em segundos direto da
+      // API da Shopee (não precisa dividir por 3600000, só por 3600).
+      let atrasoHoras = null;
+      if (node.clickTime && node.purchaseTime) {
+        const h = (node.purchaseTime - node.clickTime) / 3600;
+        if (h >= 0) atrasoHoras = h; // negativo = dado inconsistente, ignora (mesmo critério do CSV)
+      }
+
       node.orders.forEach(order => {
         const venda   = order.items.reduce((s,i) => s + (Number(i.actualAmount)||0), 0);
         const canal   = (order.items[0]?.channelType || '').toLowerCase();
@@ -5314,6 +5323,7 @@ async function buscarPedidosShopee(conta) {
           Cliques_Shopee:0,
           Pedidos_Total: (status === 'PENDING' || status === 'COMPLETED') ? 1 : 0,
           Venda_Direta:  isVendaDireta ? 1 : 0,
+          Atraso_Clique_Horas: atrasoHoras,
           Nome_Item:     order.items.map(i => i.itemName).filter(Boolean).join(', ') || null,
           item_link:     order.items[0]?.shopId && order.items[0]?.itemId
                            ? 'https://shopee.com.br/product/' + order.items[0].shopId + '/' + order.items[0].itemId
@@ -5991,6 +6001,7 @@ async function _salvarShopeeLote(pedidosArr) {
     comissao_bruta:   Number(r.Comissao)     || 0,
     venda_total:      Number(r.Venda_Total)  || 0,
     venda_direta:     Number(r.Venda_Direta) > 0,
+    atraso_clique_horas: (r.Atraso_Clique_Horas != null) ? Number(r.Atraso_Clique_Horas) : null,
     item_name:        r.Nome_Item     || null,
     item_link:        r.item_link     || null,
     shop_name:        r.shop_name     || null,

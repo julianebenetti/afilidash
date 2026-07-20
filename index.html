@@ -10716,6 +10716,7 @@ function _mensalObterAgg(escopo) {
 
   const porDia = {}; // 'AAAA-MM-DD' -> { 'OPERACAO||CONTA': resultado }
   const gastoMetaPorDia = {}; // 'AAAA-MM-DD' -> { CONTA: gasto bruto } — só visualização, fora do líquido
+  const comissaoShopeePorDia = {}; // 'AAAA-MM-DD' -> { CONTA: comissão bruta recebida } — só visualização, fora do líquido (conferência com relatório Shopee)
   DADOS.forEach(r => {
     const data = normData(r.Data);
     if (!data) return;
@@ -10730,6 +10731,10 @@ function _mensalObterAgg(escopo) {
     if (r.Plataforma === 'meta') {
       if (!gastoMetaPorDia[data]) gastoMetaPorDia[data] = {};
       gastoMetaPorDia[data][contaReal||'—'] = (gastoMetaPorDia[data][contaReal||'—']||0) + (Number(r.Gasto_Meta)||0);
+    }
+    if (r.Plataforma === 'shopee') {
+      if (!comissaoShopeePorDia[data]) comissaoShopeePorDia[data] = {};
+      comissaoShopeePorDia[data][contaReal||'—'] = (comissaoShopeePorDia[data][contaReal||'—']||0) + (Number(r.Comissao)||0);
     }
   });
 
@@ -10790,13 +10795,13 @@ function _mensalObterAgg(escopo) {
   });
   const anos = Object.keys(porAno).sort((a,b)=>a.localeCompare(b));
 
-  const valor = { porDia, gastoMetaPorDia, todasDatas, contasPorOp, opsExistentesTodas, porAno, anos };
+  const valor = { porDia, gastoMetaPorDia, comissaoShopeePorDia, todasDatas, contasPorOp, opsExistentesTodas, porAno, anos };
   _mensalAggCache = { chave, valor };
   return valor;
 }
 
 function _mensalChaveCol(c) {
-  return c.op + '||' + (c.gastoMeta ? '__GASTO_META__' : (c.conta===null ? '__TOTAL__' : c.conta));
+  return c.op + '||' + (c.gastoMeta ? '__GASTO_META__' : (c.comissaoShopee ? '__COMISSAO_SHOPEE__' : (c.conta===null ? '__TOTAL__' : c.conta)));
 }
 function _mensalToggleMascara(chave) {
   if (mensalMascaradas.has(chave)) mensalMascaradas.delete(chave); else mensalMascaradas.add(chave);
@@ -11288,7 +11293,7 @@ function renderMensal() {
     if (_infoEl) _infoEl.textContent = '';
     return;
   }
-  const { porDia, gastoMetaPorDia, todasDatas, contasPorOp, opsExistentesTodas, porAno, anos } = mensalAgg;
+  const { porDia, gastoMetaPorDia, comissaoShopeePorDia, todasDatas, contasPorOp, opsExistentesTodas, porAno, anos } = mensalAgg;
   document.getElementById('mensal-sub').textContent = todasDatas[0] + ' → ' + todasDatas[todasDatas.length-1];
 
   // ── 2. Descobre quais Operações existem, e quais Contas aparecem em cada uma ──
@@ -11304,6 +11309,8 @@ function renderMensal() {
     });
     const ativoGasto = !mensalOcultas.has('GASTO_META');
     pillsOps.push(`<button onclick="_mensalToggleCol('GASTO_META')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;border:1px solid ${ativoGasto?'var(--muted)':'var(--border)'};background:var(--bg2);color:var(--muted);${ativoGasto?'':'opacity:.5;text-decoration:line-through;'}">Gasto Total Meta</button>`);
+    const ativoComShopee = !mensalOcultas.has('COMISSAO_SHOPEE');
+    pillsOps.push(`<button onclick="_mensalToggleCol('COMISSAO_SHOPEE')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;border:1px solid ${ativoComShopee?'var(--muted)':'var(--border)'};background:var(--bg2);color:var(--muted);${ativoComShopee?'':'opacity:.5;text-decoration:line-through;'}">Comissão Shopee (bruta)</button>`);
     _toggleEl.innerHTML = pillsOps.join('');
   }
 
@@ -11314,9 +11321,11 @@ function renderMensal() {
   opsExistentes.forEach(op => {
     colunas.push({ op, conta: null });
     [...contasPorOp[op]].sort().forEach(conta => colunas.push({ op, conta }));
-    // Coluna extra só dentro de Tráfego Pago — gasto bruto do Meta Ads, só visualização
-    // (não entra no Resultado Líquido, é só pra ver o tamanho do investimento)
+    // Colunas extras só dentro de Tráfego Pago — gasto bruto Meta e comissão bruta Shopee,
+    // lado a lado, só pra conferência visual (não entram no Resultado Líquido, que já é
+    // calculado linha a linha; aqui é só "quanto saiu" x "quanto entrou" cru)
     if (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('GASTO_META')) colunas.push({ op, conta: null, gastoMeta: true });
+    if (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('COMISSAO_SHOPEE')) colunas.push({ op, conta: null, comissaoShopee: true });
   });
 
   const _infoEl2 = document.getElementById('mensal-info');
@@ -11330,7 +11339,7 @@ function renderMensal() {
       ${resultadoOculto ? '' : `<th style="text-align:right;vertical-align:middle;min-width:100px;border-left:3px solid var(--border);border-right:3px solid var(--border);font-weight:700;padding-top:14px;padding-bottom:14px;position:sticky;top:0;z-index:14;background:var(--bg3);">Resultado Líquido<br><span style="font-size:9px;color:var(--muted);font-weight:700;">TOTAL GERAL</span></th>`}
       ${opsExistentes.map(op => {
         const cor = mensalCorOp(op);
-        const colspanExtra = (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('GASTO_META')) ? 1 : 0;
+        const colspanExtra = (op === 'TRAFEGO_SHOPEE' ? (!mensalOcultas.has('GASTO_META')?1:0) + (!mensalOcultas.has('COMISSAO_SHOPEE')?1:0) : 0);
         return `<th colspan="${1+contasPorOp[op].size+colspanExtra}" style="text-align:center;vertical-align:middle;border-left:3px solid ${cor.strong};background:${cor.bg};color:${cor.strong};font-weight:700;padding-top:14px;padding-bottom:14px;position:sticky;top:0;z-index:11;">${MENSAL_OP_LABEL[op]||op}</th>`;
       }).join('')}
     </tr>
@@ -11348,6 +11357,9 @@ function renderMensal() {
         const titleMask = mascarada ? 'Clique para mostrar os valores de novo' : 'Clique para esconder os valores (****)';
         if (c.gastoMeta) {
           return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:90px;background:${cor.bg};color:var(--muted);font-weight:500;font-style:italic;position:sticky;z-index:11;border-left:1px dashed ${cor.strong};${mascarada?'text-decoration:underline wavy '+cor.strong+';':''}">Gasto Total Meta${mascarada?' 🔒':''}</th>`;
+        }
+        if (c.comissaoShopee) {
+          return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:100px;background:${cor.bg};color:var(--muted);font-weight:500;font-style:italic;position:sticky;z-index:11;border-left:1px dashed ${cor.strong};${mascarada?'text-decoration:underline wavy '+cor.strong+';':''}">Comissão Shopee (bruta)${mascarada?' 🔒':''}</th>`;
         }
         const bordaCol = primeiraDoGrupo ? 'border-left:3px solid '+cor.strong+';' : (logoAposTotal ? 'border-left:3px solid '+cor.strong+';' : (c.conta!==null?'border-left:1px dashed '+cor.strong+';':''));
         return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:80px;background:${cor.bg};${bordaCol}${c.conta===null?'font-weight:700;color:'+cor.strong+';':'color:var(--muted);font-weight:500;'}position:sticky;z-index:11;${mascarada?'text-decoration:underline wavy '+cor.strong+';':''}">${c.conta===null?'Total':esc(c.conta)}${mascarada?' 🔒':''}</th>`;
@@ -11395,6 +11407,13 @@ function renderMensal() {
     datas.forEach(dt => Object.values(gastoMetaPorDia[dt] || {}).forEach(v => s += v));
     return s;
   };
+  // Soma a comissão bruta recebida da Shopee (só visualização, fora do líquido) — mesma lógica
+  // do gasto Meta, serve pra conferir contra o relatório oficial da Shopee sem precisar de conta
+  const somaComissaoShopee = (datas) => {
+    let s = 0;
+    datas.forEach(dt => Object.values(comissaoShopeePorDia[dt] || {}).forEach(v => s += v));
+    return s;
+  };
   const linhaCelulas = (datas, bgFixo, negrito) => {
     bgFixo = bgFixo || 'var(--bg2)';
     const fw = negrito ? 'font-weight:700;' : '';
@@ -11412,6 +11431,11 @@ function renderMensal() {
         const vGasto = somaGastoMeta(datas);
         const bgSutilGasto = _hexToRgba(cor.bg, 0.2);
         return `<td style="text-align:right;background:${bgSutilGasto};color:var(--muted);font-style:italic;border-left:1px dashed ${cor.strong};${fw}">${mascarada ? '••••••' : (vGasto?r2(vGasto):'—')}</td>`;
+      }
+      if (c.comissaoShopee) {
+        const vCom = somaComissaoShopee(datas);
+        const bgSutilCom = _hexToRgba(cor.bg, 0.2);
+        return `<td style="text-align:right;background:${bgSutilCom};color:var(--green);font-style:italic;border-left:1px dashed ${cor.strong};${fw}">${mascarada ? '••••••' : (vCom?r2(vCom):'—')}</td>`;
       }
       const v = somaColuna(datas, c.op, c.conta);
       // Fundo sutil e CONSTANTE por operação, texto colorido por operação (positivo) ou vermelho (negativo)

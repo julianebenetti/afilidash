@@ -11,20 +11,20 @@ const headers = {
 
 const SUPA_URL = () => process.env.SUPABASE_URL;
 const SUPA_KEY = () => process.env.SUPABASE_KEY;
-const base     = () => `${SUPA_URL()}/rest/v1`;
+const base = () => `${SUPA_URL()}/rest/v1`;
 
 // ── HELPER: upsert em lotes ──────────────────────────────────
 const upsert = async (tabela, conflict, rows, LOTE = 200) => {
   const erros = [];
   for (let i = 0; i < rows.length; i += LOTE) {
     const lote = rows.slice(i, i + LOTE);
-    const res  = await fetch(`${base()}/${tabela}?on_conflict=${conflict}`, {
+    const res = await fetch(`${base()}/${tabela}?on_conflict=${conflict}`, {
       method: 'POST',
       headers: {
-        'apikey':        SUPA_KEY(),
+        'apikey': SUPA_KEY(),
         'Authorization': `Bearer ${SUPA_KEY()}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'resolution=merge-duplicates,return=minimal',
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify(lote),
     });
@@ -43,19 +43,19 @@ const gravarLog = async (conta, plataforma, inicio, fim, status, recebidos, salv
     await fetch(`${base()}/sync_logs`, {
       method: 'POST',
       headers: {
-        'apikey':        SUPA_KEY(),
+        'apikey': SUPA_KEY(),
         'Authorization': `Bearer ${SUPA_KEY()}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
       },
       body: JSON.stringify({
         conta, plataforma,
-        inicio:              inicio || null,
-        fim:                 fim    || null,
+        inicio: inicio || null,
+        fim: fim || null,
         status,
         registros_recebidos: recebidos || 0,
-        registros_salvos:    salvos    || 0,
-        erro:                erro ? String(erro).slice(0, 500) : null,
+        registros_salvos: salvos || 0,
+        erro: erro ? String(erro).slice(0, 500) : null,
       }),
     });
   } catch(e) {
@@ -69,17 +69,17 @@ const atualizarControl = async (conta_id, plataforma, ultima_data, registros) =>
     await fetch(`${base()}/sync_control?on_conflict=conta_id,plataforma`, {
       method: 'POST',
       headers: {
-        'apikey':        SUPA_KEY(),
+        'apikey': SUPA_KEY(),
         'Authorization': `Bearer ${SUPA_KEY()}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'resolution=merge-duplicates,return=minimal',
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify([{
         conta_id,
         plataforma,
         ultima_data,
-        ultima_execucao:  new Date().toISOString(),
-        status:           'ok',
+        ultima_execucao: new Date().toISOString(),
+        status: 'ok',
         registros_ultima: registros,
       }]),
     });
@@ -91,17 +91,20 @@ const atualizarControl = async (conta_id, plataforma, ultima_data, registros) =>
 // ── HELPER: busca em lotes por IN (PostgREST limita tamanho de URL) ──
 // Usado para comparar order_ids recebidos contra o que já existe no Supabase,
 // evitando regravar (upsert) pedidos que não mudaram nada.
+// Inclui atraso_clique_horas na comparação — sem isso, pedidos já existentes
+// (mesmo status/valores) nunca seriam regravados mesmo depois de o frontend
+// passar a enviar esse dado, porque pareceria que "nada mudou".
 const buscarExistentesPorOrderId = async (orderIds, LOTE = 200) => {
-  const mapa = {}; // order_id -> { status, comissao_bruta, venda_total, venda_direta }
+  const mapa = {}; // order_id -> { status, comissao_bruta, venda_total, venda_direta, atraso_clique_horas, ... }
   for (let i = 0; i < orderIds.length; i += LOTE) {
     const lote = orderIds.slice(i, i + LOTE);
     const filtro = lote.map(id => `"${String(id).replace(/"/g,'\\"')}"`).join(',');
     try {
       const res = await fetch(
-        `${base()}/shopee_pedidos?order_id=in.(${filtro})&select=order_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link`,
+        `${base()}/shopee_pedidos?order_id=in.(${filtro})&select=order_id,status,comissao_bruta,venda_total,venda_direta,nome_item,item_link,atraso_clique_horas`,
         {
           headers: {
-            'apikey':        SUPA_KEY(),
+            'apikey': SUPA_KEY(),
             'Authorization': `Bearer ${SUPA_KEY()}`,
           },
         }
@@ -130,6 +133,13 @@ const pedidoMudou = (novo, existente) => {
   // sem isso, pedidos com valores financeiros iguais eram pulados e o nome nunca era salvo.
   if (novo.nome_item && novo.nome_item !== existente.nome_item) return true;
   if (novo.item_link && novo.item_link !== existente.item_link) return true;
+  // atraso_clique_horas: só força regravação quando o NOVO dado tem valor real E
+  // é diferente do que já está salvo — evita reprocessar à toa pedidos que
+  // legitimamente nunca tiveram clique registrado (ambos null, não é "mudança").
+  if (novo.atraso_clique_horas != null) {
+    const antigo = existente.atraso_clique_horas;
+    if (antigo == null || Math.abs(Number(novo.atraso_clique_horas) - Number(antigo)) > TOLERANCIA_VALOR) return true;
+  }
   return false; // tudo igual — não precisa regravar
 };
 
@@ -152,41 +162,42 @@ exports.handler = async (event) => {
     // Recebe array de pedidos da API Shopee ou CSV
     // OTIMIZAÇÃO INCREMENTAL: compara com o que já existe no Supabase antes de
     // gravar — só faz upsert de pedidos novos ou que mudaram (status, comissão,
-    // venda total ou venda direta). Pedidos idênticos ao que já está salvo são
-    // pulados, reduzindo drasticamente a escrita quando a API devolve os mesmos
-    // 90 dias de histórico a cada sync.
+    // venda total, venda direta ou atraso_clique_horas). Pedidos idênticos ao
+    // que já está salvo são pulados, reduzindo drasticamente a escrita quando a
+    // API devolve os mesmos 90 dias de histórico a cada sync.
     // ════════════════════════════════════════════
     if (tipo === 'shopee') {
       const pedidos = body.pedidos || [];
       if (!pedidos.length)
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salvos: 0 }) };
 
-      const conta  = body.conta || '';
+      const conta = body.conta || '';
       const inicio = pedidos.reduce((m,r) => r.data_pedido < m ? r.data_pedido : m, pedidos[0].data_pedido);
-      const fim    = pedidos.reduce((m,r) => r.data_pedido > m ? r.data_pedido : m, pedidos[0].data_pedido);
+      const fim = pedidos.reduce((m,r) => r.data_pedido > m ? r.data_pedido : m, pedidos[0].data_pedido);
 
       // Garante campos obrigatórios e normaliza
       const todasRows = pedidos.map(p => ({
-        order_id:         p.order_id         || '',
-        conversion_id:    p.conversion_id    || null,
-        conta:            p.conta            || conta,
-        data_pedido:      p.data_pedido      || null,
-        hora_pedido:      p.hora_pedido      ?? null,
-        data_conclusao:   p.data_conclusao   || null,
-        data_click:       p.data_click       || null,
-        sub_id:           (p.sub_id          || '').toLowerCase(),
-        operacao:         p.operacao         || null,
-        status:           p.status           || null,
-        comissao_bruta:   Number(p.comissao_bruta)  || 0,
-        venda_total:      Number(p.venda_total)      || 0,
-        venda_direta:     Boolean(p.venda_direta),
-        shop_name:        p.shop_name        || null,
-        nome_item:        p.item_name        || p.nome_item        || null,
-        item_link:        p.item_link        || null,
-        channel_type:     p.channel_type     || null,
+        order_id: p.order_id || '',
+        conversion_id: p.conversion_id || null,
+        conta: p.conta || conta,
+        data_pedido: p.data_pedido || null,
+        hora_pedido: p.hora_pedido ?? null,
+        data_conclusao: p.data_conclusao || null,
+        data_click: p.data_click || null,
+        sub_id: (p.sub_id || '').toLowerCase(),
+        operacao: p.operacao || null,
+        status: p.status || null,
+        comissao_bruta: Number(p.comissao_bruta) || 0,
+        venda_total: Number(p.venda_total) || 0,
+        venda_direta: Boolean(p.venda_direta),
+        atraso_clique_horas: (p.atraso_clique_horas != null && p.atraso_clique_horas !== '') ? Number(p.atraso_clique_horas) : null,
+        shop_name: p.shop_name || null,
+        nome_item: p.item_name || p.nome_item || null,
+        item_link: p.item_link || null,
+        channel_type: p.channel_type || null,
         attribution_type: p.attribution_type || null,
-        fonte:            p.fonte            || 'api',
-        updated_at:       new Date().toISOString(),
+        fonte: p.fonte || 'api',
+        updated_at: new Date().toISOString(),
       })).filter(r => r.order_id);
 
       // Busca o que já existe no Supabase para os order_ids deste lote, e filtra
@@ -234,32 +245,32 @@ exports.handler = async (event) => {
       if (!registros.length)
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salvos: 0 }) };
 
-      const conta   = body.conta     || '';
-      const contaId = body.conta_id  || '';
-      const inicio  = registros.reduce((m,r) => r.data < m ? r.data : m, registros[0].data);
-      const fim     = registros.reduce((m,r) => r.data > m ? r.data : m, registros[0].data);
+      const conta = body.conta || '';
+      const contaId = body.conta_id || '';
+      const inicio = registros.reduce((m,r) => r.data < m ? r.data : m, registros[0].data);
+      const fim = registros.reduce((m,r) => r.data > m ? r.data : m, registros[0].data);
 
       const rows = registros.map(r => ({
         // id: conta_meta_id|data|campanha — chave única
-        id:              `${r.conta_meta_id || contaId}|${r.data}|${r.campanha || ''}`,
-        conta:           r.conta            || conta,
-        conta_meta_id:   r.conta_meta_id    || contaId,
-        data:            r.data,
-        campanha:        r.campanha         || null,
-        campanha_id:     r.campanha_id      || null,
-        status_camp:     r.status_camp      || null,
-        gasto:           Number(r.gasto)            || 0,
-        impressoes:      Number(r.impressoes)       || 0,
-        alcance:         Number(r.alcance)          || 0,
-        frequencia:      Number(r.frequencia)       || 0,
-        cliques_link:    Number(r.cliques_link)     || 0,
-        cliques_total:   Number(r.cliques_total)    || 0,
-        ctr_link:        Number(r.ctr_link)         || 0,
-        cpc_link:        Number(r.cpc_link)         || 0,
-        cpm:             Number(r.cpm)              || 0,
-        resultado:       Number(r.resultado)        || 0,
-        custo_resultado: Number(r.custo_resultado)  || 0,
-        updated_at:      new Date().toISOString(),
+        id: `${r.conta_meta_id || contaId}|${r.data}|${r.campanha || ''}`,
+        conta: r.conta || conta,
+        conta_meta_id: r.conta_meta_id || contaId,
+        data: r.data,
+        campanha: r.campanha || null,
+        campanha_id: r.campanha_id || null,
+        status_camp: r.status_camp || null,
+        gasto: Number(r.gasto) || 0,
+        impressoes: Number(r.impressoes) || 0,
+        alcance: Number(r.alcance) || 0,
+        frequencia: Number(r.frequencia) || 0,
+        cliques_link: Number(r.cliques_link) || 0,
+        cliques_total: Number(r.cliques_total) || 0,
+        ctr_link: Number(r.ctr_link) || 0,
+        cpc_link: Number(r.cpc_link) || 0,
+        cpm: Number(r.cpm) || 0,
+        resultado: Number(r.resultado) || 0,
+        custo_resultado: Number(r.custo_resultado) || 0,
+        updated_at: new Date().toISOString(),
       })).filter(r => r.data && r.conta_meta_id);
 
       const erros = await upsert('meta_ads', 'id', rows);
@@ -283,20 +294,20 @@ exports.handler = async (event) => {
       if (!cliques.length)
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salvos: 0 }) };
 
-      const conta  = body.conta || '';
+      const conta = body.conta || '';
       const inicio = cliques.reduce((m,r) => r.data < m ? r.data : m, cliques[0].data);
-      const fim    = cliques.reduce((m,r) => r.data > m ? r.data : m, cliques[0].data);
+      const fim = cliques.reduce((m,r) => r.data > m ? r.data : m, cliques[0].data);
 
       const rows = cliques.map(c => ({
-        id:            `${c.conta || conta}|${c.data}|${c.hora !== null && c.hora !== undefined ? String(c.hora).padStart(2,'0') : 'xx'}|${(c.sub_id||'').toLowerCase()}`,
-        conta:         c.conta    || conta,
-        data:          c.data,
-        hora:          c.hora     ?? null,
-        sub_id:        (c.sub_id  || '').toLowerCase(),
-        cliques:       Number(c.cliques) || 1,
-        regiao:        c.regiao   || null,
+        id: `${c.conta || conta}|${c.data}|${c.hora !== null && c.hora !== undefined ? String(c.hora).padStart(2,'0') : 'xx'}|${(c.sub_id||'').toLowerCase()}`,
+        conta: c.conta || conta,
+        data: c.data,
+        hora: c.hora ?? null,
+        sub_id: (c.sub_id || '').toLowerCase(),
+        cliques: Number(c.cliques) || 1,
+        regiao: c.regiao || null,
         referenciador: c.referenciador || null,
-        updated_at:    new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })).filter(r => r.data);
 
       const erros = await upsert('shopee_cliques', 'id', rows);
@@ -319,18 +330,18 @@ exports.handler = async (event) => {
         return { statusCode: 200, headers, body: JSON.stringify({ ok: true, salvos: 0 }) };
 
       const rows = lancamentos.map(l => ({
-        id:          l.id || `manual|${l.conta}|${l.data}|${(l.sub_id||'').toLowerCase()}`,
-        conta:       l.conta       || '',
-        data:        l.data        || null,
-        sub_id:      (l.sub_id     || '').toLowerCase(),
-        operacao:    l.operacao    || null,
-        comissao:    Number(l.comissao)    || 0,
+        id: l.id || `manual|${l.conta}|${l.data}|${(l.sub_id||'').toLowerCase()}`,
+        conta: l.conta || '',
+        data: l.data || null,
+        sub_id: (l.sub_id || '').toLowerCase(),
+        operacao: l.operacao || null,
+        comissao: Number(l.comissao) || 0,
         venda_total: Number(l.venda_total) || 0,
-        status:      l.status      || 'COMPLETED',
-        pedidos:     Number(l.pedidos)     || 0,
-        pagamentos:  Number(l.pagamentos)  || 0,
-        cliques:     Number(l.cliques)     || 0,
-        updated_at:  new Date().toISOString(),
+        status: l.status || 'COMPLETED',
+        pedidos: Number(l.pedidos) || 0,
+        pagamentos: Number(l.pagamentos) || 0,
+        cliques: Number(l.cliques) || 0,
+        updated_at: new Date().toISOString(),
       })).filter(r => r.id && r.data && r.conta);
 
       const erros = await upsert('lancamentos_manuais', 'id', rows);
@@ -354,10 +365,10 @@ exports.handler = async (event) => {
       const res = await fetch(`${base()}/lancamentos_manuais?id=eq.${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: {
-          'apikey':        SUPA_KEY(),
+          'apikey': SUPA_KEY(),
           'Authorization': `Bearer ${SUPA_KEY()}`,
-          'Content-Type':  'application/json',
-          'Prefer':        'return=minimal',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
         },
       });
 

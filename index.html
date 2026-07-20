@@ -606,6 +606,15 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <button onclick="_mensalMostrarTudo()" style="font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--muted);cursor:pointer;">Mostrar tudo</button>
       </div>
     </div>
+  <div class="section" id="resumo-rapido-section">
+    <div class="section-head">
+      <div class="section-title">Resumo Rápido por Mês</div>
+    </div>
+    <div id="rr-meses" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
+    <div id="rr-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;">Gasto por conta de anúncio</div>
+    <div id="rr-contas"></div>
+  </div>
   <div class="section">
     <div class="section-head">
       <div><div class="section-title">Resumo Mensal — Resultado Líquido por Operação <button onclick="_abrirAjuda('mensal')" title="Ajuda" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:.6;">ℹ️</button></div><div class="section-sub" id="mensal-sub">—</div></div>
@@ -11386,6 +11395,91 @@ async function renderPedidos() {
   _pedidosAtualizarBarraSelecao();
 }
 
+// ── RESUMO RÁPIDO — cards líquidos por mês + gasto por conta de anúncio Meta ──
+let _rrMesSelecionado = null;
+
+function _rrMesesDisponiveis() {
+  const set = new Set();
+  DADOS.forEach(r => {
+    const d = normData(r.Data);
+    if (d) set.add(d.slice(0, 7));
+  });
+  return [...set].sort().reverse();
+}
+
+// Recebido = TODA comissão Shopee do mês (Tráfego Pago + Grupo + Vídeo + Orgânico),
+// já líquida de imposto da plataforma. Gasto = todo gasto Meta do mês, já com o
+// imposto Meta embutido. Por conta de anúncio = só o lado do gasto (não faz
+// sentido "receber" por conta Meta, já que a venda não é atribuída 1:1 à conta).
+function _rrCalcularMes(mesKey) {
+  let gasto = 0, recebido = 0;
+  const porConta = {};
+  DADOS.forEach(r => {
+    const d = normData(r.Data);
+    if (!d || d.slice(0, 7) !== mesKey) return;
+    const der = derivar(r);
+    if (r.Plataforma === 'meta') {
+      gasto += der._gasto_total;
+      const conta = r.Conta || '—';
+      porConta[conta] = (porConta[conta] || 0) + der._gasto_total;
+    } else {
+      recebido += der.Resultado_Liq; // gastoTotal=0 nessas linhas — sobra só comissão líquida de imposto
+    }
+  });
+  return { gasto, recebido, liquido: recebido - gasto, porConta };
+}
+
+function _rrSelecionarMes(mk) {
+  _rrMesSelecionado = mk;
+  renderResumoRapido();
+}
+
+function renderResumoRapido() {
+  const elMeses = document.getElementById('rr-meses');
+  const elCards = document.getElementById('rr-cards');
+  const elContas = document.getElementById('rr-contas');
+  if (!elMeses || !elCards || !elContas) return;
+
+  const meses = _rrMesesDisponiveis();
+  if (!meses.length) {
+    elMeses.innerHTML = ''; elCards.innerHTML = '';
+    elContas.innerHTML = '<div style="font-size:12px;color:var(--muted);">Sem dados ainda.</div>';
+    return;
+  }
+  if (!_rrMesSelecionado || !meses.includes(_rrMesSelecionado)) _rrMesSelecionado = meses[0];
+
+  const fmtMes = mk => { const [a, m] = mk.split('-'); return (MGV_MESES_ABREV[parseInt(m, 10) - 1] || m) + '/' + a.slice(2); };
+  elMeses.innerHTML = meses.slice(0, 12).map(mk =>
+    `<button onclick="_rrSelecionarMes('${mk}')" style="padding:6px 14px;border-radius:16px;border:1px solid ${mk === _rrMesSelecionado ? '#2563eb' : 'var(--border)'};background:${mk === _rrMesSelecionado ? 'var(--blue-bg)' : 'var(--bg2)'};font-size:12px;font-weight:${mk === _rrMesSelecionado ? '700' : '400'};color:${mk === _rrMesSelecionado ? '#1d4ed8' : 'var(--text)'};cursor:pointer;">${esc(fmtMes(mk))}</button>`
+  ).join('');
+
+  const { gasto, recebido, liquido, porConta } = _rrCalcularMes(_rrMesSelecionado);
+  const r2 = n => 'R$\u00a0' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  elCards.innerHTML = `
+    <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;">
+      <div style="font-size:12px;color:var(--muted);">Você gastou (com imposto)</div>
+      <div style="font-size:22px;font-weight:600;color:var(--red);margin-top:2px;">${r2(gasto)}</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;">
+      <div style="font-size:12px;color:var(--muted);">Você recebeu (com imposto)</div>
+      <div style="font-size:22px;font-weight:600;color:var(--green);margin-top:2px;">${r2(recebido)}</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;">
+      <div style="font-size:12px;color:var(--muted);">Resultado líquido</div>
+      <div style="font-size:22px;font-weight:600;color:${liquido >= 0 ? 'var(--green)' : 'var(--red)'};margin-top:2px;">${liquido >= 0 ? '+' : ''}${r2(liquido)}</div>
+    </div>`;
+
+  const contasOrdenadas = Object.entries(porConta).sort((a, b) => b[1] - a[1]);
+  const maxGasto = contasOrdenadas.length ? contasOrdenadas[0][1] : 0;
+  elContas.innerHTML = contasOrdenadas.length ? contasOrdenadas.map(([conta, v]) => {
+    const pct = maxGasto > 0 ? Math.max(2, (v / maxGasto) * 100) : 0;
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>${esc(conta)}</span><span style="font-weight:600;">${r2(v)}</span></div>
+      <div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:#2a78d6;"></div></div>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--muted);">Sem gasto Meta nesse mês.</div>';
+}
+
 function renderMensal() {
   const _infoEl = document.getElementById('mensal-info');
   const escopo = escopoAtual();
@@ -11666,6 +11760,7 @@ function renderMensal() {
 
   document.getElementById('mensal-body').innerHTML = html;
   _mensalPainelPreparadoAssinatura = _mensalAssinaturaCache(escopo);
+  renderResumoRapido();
 }
 
 // ═══════════════════════════════════════════

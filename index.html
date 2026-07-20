@@ -308,6 +308,28 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
   </div>
 </div>
 
+<!-- RESYNC HISTÓRICO MODAL -->
+<div class="modal-bg" id="modal-resync-historico">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-resync-historico')">✕</button>
+    <h3>Resync Histórico Shopee</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+      Rebusca pedidos direto da API da Shopee desde a data escolhida até hoje.
+      Não duplica nada — atualiza (via upsert) pedidos que já existem, inclusive
+      preenchendo o atraso de clique que estava faltando neles.
+    </p>
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Desde</label>
+    <input type="date" id="resync-desde" value="2025-01-01" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);margin-bottom:12px;font-family:var(--font);outline:none;">
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Contas</label>
+    <div id="resync-contas-list" style="margin-bottom:12px;font-size:13px;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button id="btn-resync-teste" class="act-btn" onclick="_resyncHistoricoIniciar(true)" style="flex:1;">🧪 Testar (1 janela)</button>
+      <button id="btn-resync-completo" class="act-btn" onclick="_resyncHistoricoIniciar(false)" style="flex:1;border-color:#2563eb;color:#2563eb;">▶️ Rodar completo</button>
+    </div>
+    <div id="resync-status" style="font-size:12px;color:var(--muted);min-height:36px;white-space:pre-line;"></div>
+  </div>
+</div>
+
 <!-- Modal genérico de Ajuda — conteúdo injetado dinamicamente por _abrirAjuda(titulo, html) -->
 <div class="modal-bg" id="modal-ajuda">
   <div class="modal" style="max-width:520px;">
@@ -370,6 +392,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       <span id="info-carregamento" style="font-size:11px;color:var(--muted)"></span>
       <button id="btn-carregar-mais" class="act-btn" onclick="carregarMaisHistorico()" style="font-size:11px;display:none;">📂 Carregar mês anterior</button>
       <button class="act-btn" onclick="syncAPI()">⚡ Atualizar API</button>
+      <button class="act-btn" onclick="_abrirModalResyncHistorico()">🕐 Resync Histórico</button>
       <button class="act-btn" onclick="openModal('modal-import')">📥 Importar CSV</button>
       <input type="file" id="backup-input" accept=".json" style="display:none" onchange="importarBackup(this.files[0])">
     </div>
@@ -5229,30 +5252,18 @@ function tsHoraBR(ts) {
   return br.getUTCHours();
 }
 
-async function buscarPedidosShopee(conta) {
-  // Chama Netlify Function que faz o proxy server-side (sem CORS)
+// Busca e processa pedidos de UMA janela de tempo — usado tanto pelo sync
+// normal (90 dias, 6 janelas fixas) quanto pelo resync histórico (que pode
+// cobrir muito mais tempo, com muito mais janelas).
+async function _buscarPedidosShopeeJanela(conta, inicioTs, fimTs) {
   const url = '/.netlify/functions/shopee';
   const STATUS_MAP = { pending:'PENDING', completed:'COMPLETED', cancelled:'CANCELLED', unpaid:'UNPAID' };
-  let todos = [];
-
-  // Divide 90 dias em 3 janelas de 30 dias para evitar limite de paginação por query
-  const agora = new Date(Date.now() - 3*60*60*1000);
-  const fimBRT = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 3, 0, 0);
-  const fimTs  = Math.floor(fimBRT / 1000);
-  const janelas = [];
-  for (let j = 0; j < 6; j++) {
-    const jFim   = fimTs   - (j * 15 * 86400);
-    const jInicio = jFim   - (15 * 86400);
-    janelas.push({ inicio: jInicio, fim: jFim });
-  }
-
-  for (const janela of janelas) {
-    const { inicio, fim } = janela;
-    let scrollId = '', temMais = true, paginas = 0;
+  const rows = [];
+  let scrollId = '', temMais = true, paginas = 0;
 
   while (temMais) {
     const scrollPart = scrollId ? `,scrollId:"${scrollId}"` : '';
-    const query = `query{conversionReport(purchaseTimeStart:${inicio},purchaseTimeEnd:${fim},limit:500${scrollPart}){pageInfo{hasNextPage scrollId} nodes{purchaseTime clickTime conversionId utmContent netCommission orders{orderId orderStatus items{itemName actualAmount shopName channelType attributionType shopId itemId}}}}}`;
+    const query = `query{conversionReport(purchaseTimeStart:${inicioTs},purchaseTimeEnd:${fimTs},limit:500${scrollPart}){pageInfo{hasNextPage scrollId} nodes{purchaseTime clickTime conversionId utmContent netCommission orders{orderId orderStatus items{itemName actualAmount shopName channelType attributionType shopId itemId}}}}}`;
     const res = await fetch(url, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
@@ -5305,7 +5316,7 @@ async function buscarPedidosShopee(conta) {
                                atribType.includes('mesmo produto') || atribType.includes('same item')) &&
                               (status !== 'CANCELLED' && status !== 'UNPAID');
 
-        todos.push({
+        rows.push({
           _id:           conta.nome + '|' + order.orderId,
           Data:          dataStr,
           _hora:         tsHoraBR(node.purchaseTime),
@@ -5340,10 +5351,77 @@ async function buscarPedidosShopee(conta) {
     paginas++;
     if (paginas > 100) break; // segurança: max 100 páginas por janela (50.000 registros)
   }
-  } // fim loop janelas
+  return rows;
+}
+
+async function buscarPedidosShopee(conta) {
+  // Divide 90 dias em 6 janelas de 15 dias para evitar limite de paginação por query
+  const agora = new Date(Date.now() - 3*60*60*1000);
+  const fimBRT = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 3, 0, 0);
+  const fimTs  = Math.floor(fimBRT / 1000);
+  const janelas = [];
+  for (let j = 0; j < 6; j++) {
+    const jFim   = fimTs   - (j * 15 * 86400);
+    const jInicio = jFim   - (15 * 86400);
+    janelas.push({ inicio: jInicio, fim: jFim });
+  }
+
+  let todos = [];
+  for (const janela of janelas) {
+    const rows = await _buscarPedidosShopeeJanela(conta, janela.inicio, janela.fim);
+    todos = todos.concat(rows);
+  }
   // Remove duplicatas por order_id (pode aparecer em janelas sobrepostas)
   const uniq = {}; todos.forEach(r => { uniq[r.Order_ID] = r; });
   return Object.values(uniq);
+}
+
+// ── RESYNC HISTÓRICO — rebusca desde uma data específica até hoje, em janelas
+// de 15 dias, salvando incrementalmente após cada janela (não perde progresso
+// se cair a conexão no meio). Reaproveita o mesmo upsert do sync normal — não
+// duplica nada, só atualiza (inclusive o atraso_clique_horas que faltava).
+async function executarResyncHistoricoShopee(desdeStr, contas, onProgress, maxJanelas) {
+  const desdeTs = Math.floor(new Date(desdeStr + 'T00:00:00-03:00').getTime() / 1000);
+  const agora = new Date(Date.now() - 3*60*60*1000);
+  const fimBRT = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 3, 0, 0);
+  const fimTsTotal = Math.floor(fimBRT / 1000);
+
+  const janelas = [];
+  let jFim = fimTsTotal;
+  while (jFim > desdeTs) {
+    const jInicio = Math.max(jFim - 15*86400, desdeTs);
+    janelas.push({ inicio: jInicio, fim: jFim });
+    jFim = jInicio;
+  }
+
+  // Modo teste: pega só a janela MAIS ANTIGA (mais próxima de "desde") — é a
+  // mais arriscada de estourar limite de retenção da API da Shopee, então é
+  // a que mais vale a pena confirmar antes de rodar tudo.
+  const janelasAlvo = (maxJanelas && maxJanelas < janelas.length) ? janelas.slice(-maxJanelas) : janelas;
+
+  let totalBuscados = 0, totalSalvos = 0, totalPulados = 0;
+  const erros = [];
+
+  for (const conta of contas) {
+    for (let i = 0; i < janelasAlvo.length; i++) {
+      const j = janelasAlvo[i];
+      try {
+        const rows = await _buscarPedidosShopeeJanela(conta, j.inicio, j.fim);
+        totalBuscados += rows.length;
+        if (rows.length) {
+          const { ok, pulados, erros: erSalvar } = await _salvarShopeeLote(rows);
+          totalSalvos += ok;
+          totalPulados += pulados;
+          if (erSalvar.length) erros.push(...erSalvar.map(e => conta.nome + ': ' + e));
+        }
+      } catch(e) {
+        erros.push(conta.nome + ' janela ' + (i+1) + '/' + janelasAlvo.length + ': ' + e.message);
+      }
+      if (onProgress) onProgress({ conta: conta.nome, janela: i+1, totalJanelas: janelasAlvo.length, totalBuscados, totalSalvos, totalPulados, erros });
+      await new Promise(r => setTimeout(r, 300)); // pausa curta entre chamadas — não estourar rate limit da Shopee
+    }
+  }
+  return { totalBuscados, totalSalvos, totalPulados, erros };
 }
 
 // ═══════════════════════════════════════════
@@ -6082,6 +6160,62 @@ async function _salvarMetaLote(dadosArr) {
     }
   }
   return { ok, erros };
+}
+
+// ── RESYNC HISTÓRICO — abre o modal já populado com as contas Shopee ativas ──
+function _abrirModalResyncHistorico() {
+  const contasApi = CFG_SHOPEE.filter(c => c.ativo && c.tipo === 'api' && c.appId && c.secret);
+  const lista = document.getElementById('resync-contas-list');
+  if (lista) {
+    if (!contasApi.length) {
+      lista.innerHTML = '<span style="color:var(--muted);">Nenhuma conta Shopee via API configurada.</span>';
+    } else {
+      lista.innerHTML = contasApi.map(c =>
+        `<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" class="resync-conta-check" value="${esc(c.nome)}" checked> ${esc(c.nome)}
+        </label>`
+      ).join('');
+    }
+  }
+  const statusEl = document.getElementById('resync-status');
+  if (statusEl) statusEl.textContent = '';
+  openModal('modal-resync-historico');
+}
+
+async function _resyncHistoricoIniciar(modoTeste) {
+  const desdeStr = document.getElementById('resync-desde')?.value;
+  if (!desdeStr) { alert('Escolha a data "desde".'); return; }
+  const contasNomes = [...document.querySelectorAll('.resync-conta-check:checked')].map(el => el.value);
+  if (!contasNomes.length) { alert('Selecione ao menos uma conta.'); return; }
+  const contas = CFG_SHOPEE.filter(c => contasNomes.includes(c.nome) && c.appId && c.secret);
+
+  const statusEl = document.getElementById('resync-status');
+  const btnTeste = document.getElementById('btn-resync-teste');
+  const btnCompleto = document.getElementById('btn-resync-completo');
+  if (btnTeste) btnTeste.disabled = true;
+  if (btnCompleto) btnCompleto.disabled = true;
+  if (statusEl) statusEl.textContent = '⏳ Iniciando...';
+
+  try {
+    const resultado = await executarResyncHistoricoShopee(desdeStr, contas, (p) => {
+      if (statusEl) statusEl.textContent =
+        `⏳ ${p.conta} — janela ${p.janela}/${p.totalJanelas}\n` +
+        `${p.totalBuscados} buscados · ${p.totalSalvos} salvos · ${p.totalPulados} sem alteração` +
+        (p.erros.length ? `\n⚠️ ${p.erros.length} erro(s)` : '');
+    }, modoTeste ? 1 : null);
+
+    _pedidosCache = {}; // invalida cache — dados podem ter mudado
+    _marcarDADOSAlterados();
+    if (statusEl) statusEl.textContent =
+      `✓ Concluído${modoTeste ? ' (modo teste — 1 janela)' : ''}\n` +
+      `${resultado.totalBuscados} buscados · ${resultado.totalSalvos} salvos · ${resultado.totalPulados} sem alteração` +
+      (resultado.erros.length ? `\n⚠️ ${resultado.erros.length} erro(s):\n${resultado.erros.slice(0,5).join('\n')}` : '');
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '✗ Erro: ' + e.message;
+  } finally {
+    if (btnTeste) btnTeste.disabled = false;
+    if (btnCompleto) btnCompleto.disabled = false;
+  }
 }
 
 async function syncAPI() {
@@ -10812,7 +10946,7 @@ function _mensalObterAgg(escopo) {
 }
 
 function _mensalChaveCol(c) {
-  return c.op + '||' + (c.gastoMeta ? '__GASTO_META__' : (c.comissaoShopee ? '__COMISSAO_SHOPEE__' : (c.conta===null ? '__TOTAL__' : c.conta)));
+  return c.op + '||' + (c.gastoMeta ? '__GASTO_META__' : (c.comissaoShopee ? '__COMISSAO_SHOPEE__' : (c.resultadoBruto ? '__RESULTADO_BRUTO__' : (c.conta===null ? '__TOTAL__' : c.conta))));
 }
 function _mensalToggleMascara(chave) {
   if (mensalMascaradas.has(chave)) mensalMascaradas.delete(chave); else mensalMascaradas.add(chave);
@@ -11322,6 +11456,8 @@ function renderMensal() {
     pillsOps.push(`<button onclick="_mensalToggleCol('GASTO_META')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;border:1px solid ${ativoGasto?'var(--muted)':'var(--border)'};background:var(--bg2);color:var(--muted);${ativoGasto?'':'opacity:.5;text-decoration:line-through;'}">Gasto Total Meta</button>`);
     const ativoComShopee = !mensalOcultas.has('COMISSAO_SHOPEE');
     pillsOps.push(`<button onclick="_mensalToggleCol('COMISSAO_SHOPEE')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;border:1px solid ${ativoComShopee?'var(--muted)':'var(--border)'};background:var(--bg2);color:var(--muted);${ativoComShopee?'':'opacity:.5;text-decoration:line-through;'}">Comissão Shopee (bruta)</button>`);
+    const ativoResBruto = !mensalOcultas.has('RESULTADO_BRUTO');
+    pillsOps.push(`<button onclick="_mensalToggleCol('RESULTADO_BRUTO')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;border:1px solid ${ativoResBruto?'#7c3aed':'var(--border)'};background:${ativoResBruto?'#f3e8ff':'var(--bg2)'};color:${ativoResBruto?'#7c3aed':'var(--muted)'};font-weight:700;${ativoResBruto?'':'opacity:.5;text-decoration:line-through;'}">Resultado Bruto (sem imposto)</button>`);
     _toggleEl.innerHTML = pillsOps.join('');
   }
 
@@ -11337,6 +11473,7 @@ function renderMensal() {
     // calculado linha a linha; aqui é só "quanto saiu" x "quanto entrou" cru)
     if (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('GASTO_META')) colunas.push({ op, conta: null, gastoMeta: true });
     if (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('COMISSAO_SHOPEE')) colunas.push({ op, conta: null, comissaoShopee: true });
+    if (op === 'TRAFEGO_SHOPEE' && !mensalOcultas.has('RESULTADO_BRUTO')) colunas.push({ op, conta: null, resultadoBruto: true });
   });
 
   const _infoEl2 = document.getElementById('mensal-info');
@@ -11350,7 +11487,7 @@ function renderMensal() {
       ${resultadoOculto ? '' : `<th style="text-align:right;vertical-align:middle;min-width:100px;border-left:3px solid var(--border);border-right:3px solid var(--border);font-weight:700;padding-top:14px;padding-bottom:14px;position:sticky;top:0;z-index:14;background:var(--bg3);">Resultado Líquido<br><span style="font-size:9px;color:var(--muted);font-weight:700;">TOTAL GERAL</span></th>`}
       ${opsExistentes.map(op => {
         const cor = mensalCorOp(op);
-        const colspanExtra = (op === 'TRAFEGO_SHOPEE' ? (!mensalOcultas.has('GASTO_META')?1:0) + (!mensalOcultas.has('COMISSAO_SHOPEE')?1:0) : 0);
+        const colspanExtra = (op === 'TRAFEGO_SHOPEE' ? (!mensalOcultas.has('GASTO_META')?1:0) + (!mensalOcultas.has('COMISSAO_SHOPEE')?1:0) + (!mensalOcultas.has('RESULTADO_BRUTO')?1:0) : 0);
         return `<th colspan="${1+contasPorOp[op].size+colspanExtra}" style="text-align:center;vertical-align:middle;border-left:3px solid ${cor.strong};background:${cor.bg};color:${cor.strong};font-weight:700;padding-top:14px;padding-bottom:14px;position:sticky;top:0;z-index:11;">${MENSAL_OP_LABEL[op]||op}</th>`;
       }).join('')}
     </tr>
@@ -11371,6 +11508,9 @@ function renderMensal() {
         }
         if (c.comissaoShopee) {
           return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:100px;background:${cor.bg};color:var(--muted);font-weight:500;font-style:italic;position:sticky;z-index:11;border-left:1px dashed ${cor.strong};${mascarada?'text-decoration:underline wavy '+cor.strong+';':''}">Comissão Shopee (bruta)${mascarada?' 🔒':''}</th>`;
+        }
+        if (c.resultadoBruto) {
+          return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="Comissão bruta menos Gasto Meta bruto — SEM impostos. ${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:110px;background:#f3e8ff;color:#7c3aed;font-weight:700;position:sticky;z-index:11;border-left:2px solid #7c3aed;${mascarada?'text-decoration:underline wavy #7c3aed;':''}">Resultado Bruto${mascarada?' 🔒':''}<br><span style="font-size:8px;font-weight:400;">(sem imposto)</span></th>`;
         }
         const bordaCol = primeiraDoGrupo ? 'border-left:3px solid '+cor.strong+';' : (logoAposTotal ? 'border-left:3px solid '+cor.strong+';' : (c.conta!==null?'border-left:1px dashed '+cor.strong+';':''));
         return `<th onclick="_mensalToggleMascara('${chaveCol}')" title="${titleMask}" style="cursor:pointer;text-align:center;font-size:10px;min-width:80px;background:${cor.bg};${bordaCol}${c.conta===null?'font-weight:700;color:'+cor.strong+';':'color:var(--muted);font-weight:500;'}position:sticky;z-index:11;${mascarada?'text-decoration:underline wavy '+cor.strong+';':''}">${c.conta===null?'Total':esc(c.conta)}${mascarada?' 🔒':''}</th>`;
@@ -11425,6 +11565,11 @@ function renderMensal() {
     datas.forEach(dt => Object.values(comissaoShopeePorDia[dt] || {}).forEach(v => s += v));
     return s;
   };
+  // Resultado Bruto = Comissão Shopee bruta − Gasto Meta bruto, SEM nenhum imposto —
+  // existe separado do Resultado Líquido (que desconta imposto Meta + imposto da
+  // plataforma) justamente pra dar pra conferir os dois brutos lado a lado sem
+  // precisar fazer conta de cabeça nem confundir com o líquido.
+  const somaResultadoBruto = (datas) => somaComissaoShopee(datas) - somaGastoMeta(datas);
   const linhaCelulas = (datas, bgFixo, negrito) => {
     bgFixo = bgFixo || 'var(--bg2)';
     const fw = negrito ? 'font-weight:700;' : '';
@@ -11447,6 +11592,11 @@ function renderMensal() {
         const vCom = somaComissaoShopee(datas);
         const bgSutilCom = _hexToRgba(cor.bg, 0.2);
         return `<td style="text-align:right;background:${bgSutilCom};color:var(--green);font-style:italic;border-left:1px dashed ${cor.strong};${fw}">${mascarada ? '••••••' : (vCom?r2(vCom):'—')}</td>`;
+      }
+      if (c.resultadoBruto) {
+        const vBruto = somaResultadoBruto(datas);
+        const corBruto = vBruto > 0 ? 'var(--green)' : vBruto < 0 ? 'var(--red)' : 'var(--muted)';
+        return `<td style="text-align:right;background:#f3e8ff;color:${corBruto};font-weight:700;border-left:2px solid #7c3aed;${fw}">${mascarada ? '••••••' : (vBruto?r2(vBruto):'—')}</td>`;
       }
       const v = somaColuna(datas, c.op, c.conta);
       // Fundo sutil e CONSTANTE por operação, texto colorido por operação (positivo) ou vermelho (negativo)

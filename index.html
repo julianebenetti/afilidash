@@ -330,6 +330,25 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
   </div>
 </div>
 
+<!-- RESYNC HISTÓRICO META MODAL -->
+<div class="modal-bg" id="modal-resync-meta">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-resync-meta')">✕</button>
+    <h3>Resync Histórico Meta</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+      Rebusca gasto direto na API do Meta desde a data escolhida até hoje.
+      Não duplica nada — atualiza (via upsert) o que já existe, e preenche
+      buracos de dias que nunca chegaram a ser sincronizados.
+    </p>
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Desde</label>
+    <input type="date" id="resync-meta-desde" value="2025-01-01" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);margin-bottom:12px;font-family:var(--font);outline:none;">
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Contas</label>
+    <div id="resync-meta-contas-list" style="margin-bottom:12px;font-size:13px;"></div>
+    <button id="btn-resync-meta-completo" class="act-btn" onclick="_resyncMetaIniciar()" style="width:100%;margin-bottom:10px;border-color:#2563eb;color:#2563eb;">▶️ Rodar</button>
+    <div id="resync-meta-status" style="font-size:12px;color:var(--muted);min-height:36px;white-space:pre-line;"></div>
+  </div>
+</div>
+
 <!-- Modal genérico de Ajuda — conteúdo injetado dinamicamente por _abrirAjuda(titulo, html) -->
 <div class="modal-bg" id="modal-ajuda">
   <div class="modal" style="max-width:520px;">
@@ -392,7 +411,8 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       <span id="info-carregamento" style="font-size:11px;color:var(--muted)"></span>
       <button id="btn-carregar-mais" class="act-btn" onclick="carregarMaisHistorico()" style="font-size:11px;display:none;">📂 Carregar mês anterior</button>
       <button class="act-btn" onclick="syncAPI()">⚡ Atualizar API</button>
-      <button class="act-btn" onclick="_abrirModalResyncHistorico()">🕐 Resync Histórico</button>
+      <button class="act-btn" onclick="_abrirModalResyncHistorico()">🕐 Resync Histórico Shopee</button>
+      <button class="act-btn" onclick="_abrirModalResyncMeta()">🕐 Resync Histórico Meta</button>
       <button class="act-btn" onclick="openModal('modal-import')">📥 Importar CSV</button>
       <input type="file" id="backup-input" accept=".json" style="display:none" onchange="importarBackup(this.files[0])">
     </div>
@@ -6030,6 +6050,49 @@ async function buscarDadosMeta(contaMeta) {
   return await _buscarInsightsMeta(contaMeta, since, until, statusMap, idsCampanhaUnica, idsAnuncioMultiplo);
 }
 
+// ── RESYNC HISTÓRICO META — rebusca desde uma data específica, salvando
+// incrementalmente por conta (não perde progresso se cair no meio). Reaproveita
+// a mesma checagem de estrutura e o mesmo upsert do sync normal — se a checagem
+// falhar pra alguma conta, PULA essa conta (não usa fallback perigoso que
+// duplicaria dado, igual já corrigimos no sync normal).
+async function executarResyncHistoricoMeta(desdeStr, contas, onProgress) {
+  const agoraBRT = new Date(Date.now() - 3*60*60*1000);
+  const fmt = d => d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+  const ontemBRT = new Date(agoraBRT); ontemBRT.setUTCDate(ontemBRT.getUTCDate()-1);
+  const until = fmt(ontemBRT);
+
+  let totalBuscados = 0, totalSalvos = 0;
+  const erros = [];
+
+  for (const conta of contas) {
+    try {
+      const statusMap = {};
+      let idsCampanhaUnica = [], idsAnuncioMultiplo = [];
+      try {
+        const _r = await _buscarStatusOrcamentoMeta(conta);
+        Object.assign(statusMap, _r.statusMap);
+        idsCampanhaUnica   = _r.idsCampanhaUnica   || [];
+        idsAnuncioMultiplo = _r.idsAnuncioMultiplo || [];
+      } catch(e) {
+        erros.push(conta.nome + ': falha ao checar estrutura de campanhas, pulando essa conta — ' + e.message);
+        if (onProgress) onProgress({ conta: conta.nome, totalBuscados, totalSalvos, erros });
+        continue;
+      }
+      const dados = await _buscarInsightsMeta(conta, desdeStr, until, statusMap, idsCampanhaUnica, idsAnuncioMultiplo);
+      totalBuscados += dados.length;
+      if (dados.length) {
+        const { ok, erros: erSalvar } = await _salvarMetaLote(dados);
+        totalSalvos += ok;
+        if (erSalvar.length) erros.push(...erSalvar.map(e => conta.nome + ': ' + e));
+      }
+    } catch(e) {
+      erros.push(conta.nome + ': ' + e.message);
+    }
+    if (onProgress) onProgress({ conta: conta.nome, totalBuscados, totalSalvos, erros });
+  }
+  return { totalBuscados, totalSalvos, erros };
+}
+
 // ═══════════════════════════════════════════
 // ATUALIZAR API — orquestra tudo
 // ═══════════════════════════════════════════
@@ -6230,6 +6293,57 @@ async function _resyncHistoricoIniciar(modoTeste) {
   } finally {
     if (btnTeste) btnTeste.disabled = false;
     if (btnCompleto) btnCompleto.disabled = false;
+  }
+}
+
+// ── RESYNC HISTÓRICO META — abre o modal já populado com as contas Meta ativas ──
+function _abrirModalResyncMeta() {
+  const contasAtivas = (CFG_META || []).filter(c => c.ativo && c.accountId && c.token);
+  const lista = document.getElementById('resync-meta-contas-list');
+  if (lista) {
+    if (!contasAtivas.length) {
+      lista.innerHTML = '<span style="color:var(--muted);">Nenhuma conta Meta configurada.</span>';
+    } else {
+      lista.innerHTML = contasAtivas.map(c =>
+        `<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;">
+          <input type="checkbox" class="resync-meta-conta-check" value="${esc(c.id)}" checked> ${esc(c.nome)}
+        </label>`
+      ).join('');
+    }
+  }
+  const statusEl = document.getElementById('resync-meta-status');
+  if (statusEl) statusEl.textContent = '';
+  openModal('modal-resync-meta');
+}
+
+async function _resyncMetaIniciar() {
+  const desdeStr = document.getElementById('resync-meta-desde')?.value;
+  if (!desdeStr) { alert('Escolha a data "desde".'); return; }
+  const idsSelecionados = [...document.querySelectorAll('.resync-meta-conta-check:checked')].map(el => el.value);
+  if (!idsSelecionados.length) { alert('Selecione ao menos uma conta.'); return; }
+  const contas = (CFG_META || []).filter(c => idsSelecionados.includes(c.id) && c.accountId && c.token);
+
+  const statusEl = document.getElementById('resync-meta-status');
+  const btn = document.getElementById('btn-resync-meta-completo');
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.textContent = '⏳ Iniciando...';
+
+  try {
+    const resultado = await executarResyncHistoricoMeta(desdeStr, contas, (p) => {
+      if (statusEl) statusEl.textContent =
+        `⏳ ${p.conta}\n` +
+        `${p.totalBuscados} buscados · ${p.totalSalvos} salvos` +
+        (p.erros.length ? `\n⚠️ ${p.erros.length} erro(s)` : '');
+    });
+
+    _marcarDADOSAlterados();
+    if (statusEl) statusEl.textContent =
+      `✓ Concluído\n${resultado.totalBuscados} buscados · ${resultado.totalSalvos} salvos` +
+      (resultado.erros.length ? `\n⚠️ ${resultado.erros.length} erro(s):\n${resultado.erros.slice(0,5).join('\n')}` : '');
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '✗ Erro: ' + e.message;
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

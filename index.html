@@ -2417,19 +2417,30 @@ function _mdtCalcularValidacao(periodoDias, hoje) {
   });
 
   const porDia = {};
-  MDT_DIAS_SEMANA.forEach(d => porDia[d] = { dia: d, testados: 0, validados: 0, reprovados: 0 });
+  MDT_DIAS_SEMANA.forEach(d => porDia[d] = { dia: d, testados: 0, validados: 0, reprovados: 0, detalheValidados: [], detalheReprovados: [] });
 
   sids.forEach(sid => {
     const d0str = _primeiraDataGasto(sid);
     const d0 = new Date(d0str + 'T00:00:00');
     const diaSemana = MDT_DIAS_SEMANA[d0.getDay()];
     const infoHoje = _analisarMGD(sid);
-    const valido = _primeiroDiaValidacao(sid) != null;
+    const diaValidacao = _primeiroDiaValidacao(sid);
+    const valido = diaValidacao != null;
     const reprovado = !valido && (infoHoje.veredito === 'DESATIVAR' || infoHoje.veredito === 'PAUSAR');
     const p = porDia[diaSemana];
     p.testados++;
-    if (valido) p.validados++;
-    if (reprovado) p.reprovados++;
+    const cfgC = CFG_CAMPANHAS[sid] || {};
+    const detalhe = {
+      sid,
+      produto: cfgC.produto || '—',
+      gancho: cfgC.gancho || '—',
+      formato: cfgC.formato || '—',
+      roas: _roasAcumuladoTotalCampanha(sid),
+      d0: d0str,
+      status: infoHoje.classificacao || (valido ? 'Validado' : '—'),
+    };
+    if (valido) { p.validados++; p.detalheValidados.push(detalhe); }
+    if (reprovado) { p.reprovados++; p.detalheReprovados.push(detalhe); }
   });
 
   const ranking = Object.values(porDia).filter(p => p.testados > 0).map(p => ({
@@ -2458,6 +2469,11 @@ async function _mdtCarregarEProcessar(periodoDias) {
   renderMdt();
 }
 
+function _mdtToggleValidados(i) {
+  const el = document.getElementById('mdt-validados-' + i);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
 function _mdtToggleLeitura(i) {
   const el = document.getElementById('mdt-leitura-' + i);
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
@@ -2482,17 +2498,52 @@ function renderMdt() {
   const classeLinha = (i, total) => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : (i >= total - 2 ? 'bad' : '');
   const corFundo = { gold: '#fff8e1', silver: '#f5f5f5', bronze: '#fdf1e6', bad: '#fdecea' };
 
-  const leituraDia = (p, i, total) => {
-    if (i === 0) return `Melhor CPC do grupo (${p.anuncios} anúncio(s) avaliados). Prioridade nº1 pra lançar criativo novo.`;
-    if (i <= 2) return `Entre os 3 melhores dias — ${p.anuncios} anúncio(s) na amostra.`;
-    if (i >= total - 2) return `Pior desempenho — evitar concentrar lançamentos aqui.`;
-    return `Desempenho mediano — ${p.anuncios} anúncio(s) na amostra.`;
+  const leituraDia = (p, i, ranking) => {
+    const total = ranking.length;
+    const porCPM = [...ranking].sort((a, b) => (a.cpm ?? Infinity) - (b.cpm ?? Infinity));
+    const rankCPM = porCPM.findIndex(x => x.dia === p.dia);
+    const entregaPorAnuncio = p.anuncios > 0 ? p.impressoes / p.anuncios : 0;
+    const totalImpressoesRank = ranking.reduce((s, x) => s + x.impressoes, 0);
+    const totalAnunciosRank = ranking.reduce((s, x) => s + x.anuncios, 0);
+    const entregaMedia = totalAnunciosRank > 0 ? totalImpressoesRank / totalAnunciosRank : 0;
+    const concentracao = res.totalAnuncios > 0 ? (p.anuncios / res.totalAnuncios) * 100 : 0;
+    const fmtN = n => Math.round(n).toLocaleString('pt-BR');
+
+    const partes = [];
+
+    // Qualidade do custo (CPC x CPM juntos, igual ao relatório de referência)
+    if (i === 0 && rankCPM === 0) partes.push('Melhor custo por clique E melhor custo por alcance do grupo');
+    else if (i === 0) partes.push('Melhor custo por clique do grupo');
+    else if (rankCPM === 0) partes.push('Melhor custo por alcance (CPM) do grupo, mesmo não sendo o 1º em CPC');
+    else if (i <= 2 && rankCPM <= 2) partes.push('Bom CPC e bom CPM — entre os 3 melhores nos dois critérios');
+    else if (i <= 2) partes.push('Bom CPC, CPM mediano');
+    else if (i >= total - 2) partes.push('Um dos piores CPC do grupo');
+
+    // Entrega (volume) — explica se o custo mais alto é "compensado" por mais entrega, ou se é ruim mesmo
+    if (entregaMedia > 0) {
+      if (entregaPorAnuncio >= entregaMedia * 1.15) {
+        partes.push(`entrega boa (${fmtN(entregaPorAnuncio)} impressões/anúncio)${i >= total - 3 ? ' — o custo aqui é justificado por volume, não por ineficiência' : ' a preço baixo'}`);
+      } else if (entregaPorAnuncio <= entregaMedia * 0.85 && i >= total - 3) {
+        partes.push(`entrega mais baixa que a média (${fmtN(entregaPorAnuncio)} impressões/anúncio) — não é caro por entregar mais, é caro entregando menos`);
+      }
+    }
+
+    // Concentração de uso — alerta se é o dia mais usado mas não é o melhor
+    if (concentracao >= 25) {
+      partes.push(`é o dia mais usado hoje (${Math.round(concentracao)}% dos lançamentos avaliados)${i >= total - 3 ? ' — vale reduzir concentração de testes nesse dia' : ''}`);
+    }
+
+    // Tamanho da amostra — sempre no fim, como aviso
+    if (p.anuncios < 20) partes.push(`amostra pequena (${p.anuncios} anúncio${p.anuncios === 1 ? '' : 's'}) — achado a confirmar com mais dados`);
+    else partes.push(`amostra robusta (${p.anuncios} anúncios)`);
+
+    return partes.join('. ') + '.';
   };
 
   // Ranking de dias
   const linhasRanking = res.ranking.map((p, i) => {
     const cls = classeLinha(i, res.ranking.length);
-    const leitura = leituraDia(p, i, res.ranking.length);
+    const leitura = leituraDia(p, i, res.ranking);
     const bg = corFundo[cls] || 'transparent';
     return `<tr style="background:${bg};cursor:pointer;" onclick="_mdtToggleLeitura(${i})" title="${esc(leitura)}">
       <td style="font-weight:700;">${medalha(i)}</td>
@@ -2546,14 +2597,34 @@ function renderMdt() {
   const linhasValidacao = val.ranking.map((p, i) => {
     const cls = p.testados < 3 ? 'muted' : (i === 0 ? 'gold' : i <= 1 ? 'silver' : (i >= val.ranking.length - 2 ? 'bad' : ''));
     const bg = corFundo[cls] || 'transparent';
-    return `<tr style="background:${bg};">
+    const temValidados = p.detalheValidados && p.detalheValidados.length > 0;
+    const linhasDetalhe = temValidados ? p.detalheValidados.map(d => `<tr>
+        <td style="padding:6px 8px;">${esc(d.sid)}</td>
+        <td style="padding:6px 8px;">${esc(d.produto)}</td>
+        <td style="padding:6px 8px;">${esc(d.gancho)}</td>
+        <td style="padding:6px 8px;">${esc(d.formato)}</td>
+        <td style="padding:6px 8px;font-weight:700;">${d.roas.toFixed(2)}x</td>
+        <td style="padding:6px 8px;">${esc(d.status)}</td>
+      </tr>`).join('') : '';
+    return `<tr style="background:${bg};${temValidados ? 'cursor:pointer;' : ''}" ${temValidados ? `onclick="_mdtToggleValidados(${i})"` : ''} title="${temValidados ? 'Clique pra ver os anúncios que validaram' : ''}">
       <td style="font-weight:700;">${medalhaVal(i)}</td>
-      <td><b>${esc(p.dia)}</b></td>
+      <td><b>${esc(p.dia)}</b>${temValidados ? ' <span style="font-size:10px;color:var(--muted);">▾</span>' : ''}</td>
       <td>${p.testados}${p.testados < 3 ? ' <span style="font-size:10px;color:var(--muted);">(amostra pequena)</span>' : ''}</td>
       <td>${p.validados}</td>
       <td style="font-weight:700;">${r2(p.taxa)}%</td>
       <td>${p.reprovados}</td>
-    </tr>`;
+    </tr>
+    ${temValidados ? `<tr id="mdt-validados-${i}" style="display:none;background:${bg};">
+      <td colspan="6" style="padding:8px 12px 14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;background:var(--bg);border-radius:6px;overflow:hidden;">
+          <thead><tr style="text-align:left;background:var(--bg2);">
+            <th style="padding:6px 8px;">Sub_ID</th><th style="padding:6px 8px;">Produto</th><th style="padding:6px 8px;">Gancho</th>
+            <th style="padding:6px 8px;">Formato</th><th style="padding:6px 8px;">ROAS acumulado</th><th style="padding:6px 8px;">Classificação</th>
+          </tr></thead>
+          <tbody>${linhasDetalhe}</tbody>
+        </table>
+      </td>
+    </tr>` : ''}`;
   }).join('') || '<tr><td colspan="6" style="color:var(--muted);padding:12px;">Sem campanhas com D0–D3 completo nesse período pra avaliar validação.</td></tr>';
   const melhorDiaValidacao = val.ranking[0]?.dia || null;
 

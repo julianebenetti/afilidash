@@ -445,6 +445,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
       <span class="section-sub" id="garimpo-count-label"></span>
       <div class="controls" id="garimpo-filters" style="margin-left:auto;"></div>
     </div>
+    <div class="controls" id="garimpo-filters-tipo" style="padding:0 16px 10px;"></div>
     <div style="padding:10px 16px; display:flex; gap:8px;">
       <select class="op-sel" id="garimpo-filter-field">
         <option value="produto">Produto</option>
@@ -464,6 +465,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <thead>
           <tr>
             <th style="text-align:left;" data-key="produto" onclick="garimpoSort('produto')">Produto</th>
+            <th data-key="tipo" onclick="garimpoSort('tipo')">Tipo</th>
             <th data-key="nicho" onclick="garimpoSort('nicho')">Nicho</th>
             <th data-key="preco" onclick="garimpoSort('preco')">Preço</th>
             <th data-key="comissao_percentual" onclick="garimpoSort('comissao_percentual')">Com. %</th>
@@ -473,9 +475,10 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
             <th data-key="data_indicacao" onclick="garimpoSort('data_indicacao')">Sugerido em</th>
             <th>Link</th>
             <th>Início do teste</th>
+            <th>Avaliação</th>
           </tr>
         </thead>
-        <tbody id="garimpo-tbody"><tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted);">Carregando…</td></tr></tbody>
+        <tbody id="garimpo-tbody"><tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted);">Carregando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -503,8 +506,8 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 // ── Namespace isolado "garimpo*" — não colide com nenhuma função existente do AfiliDash ──
 const GARIMPO_URL = "https://tkxkrbdvcctoajuigvvv.supabase.co";
 const GARIMPO_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRreGtyYmR2Y2N0b2FqdWlndnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NzY2NzUsImV4cCI6MjA5OTQ1MjY3NX0.-szTE2wYYr9DNTLiff6zmLpbP6UOL1l9SFpvc-29Njs";
-let garimpoProdutos = [], garimpoTop = [], garimpoCronograma = [];
-let garimpoActiveFilter = "Todos", garimpoSortKey = null, garimpoSortDir = 1;
+let garimpoProdutos = [], garimpoTop = [], garimpoCronograma = [], garimpoChecklists = [];
+let garimpoActiveFilter = "Todos", garimpoActiveTipo = "Todos", garimpoSortKey = null, garimpoSortDir = 1;
 let garimpoFreeField = "produto", garimpoFreeText = "";
 
 function garimpoFmtNum(n){ return new Intl.NumberFormat('pt-BR').format(n||0); }
@@ -525,16 +528,23 @@ async function garimpoPatch(table, produto, body){
 
 async function garimpoLoadAll(){
   try{
-    const [produtos, top, cronograma] = await Promise.all([
+    const [produtos, top, cronograma, checklists] = await Promise.all([
       garimpoFetch('garimpo_produtos?select=*&order=cpa_maximo.desc'),
       garimpoFetch('garimpo_top3?select=*&order=data_indicacao.desc,cpa_maximo.desc'),
-      garimpoFetch('garimpo_cronograma?select=*')
+      garimpoFetch('garimpo_cronograma?select=*'),
+      garimpoFetch('garimpo_checklist?select=*')
     ]);
-    garimpoProdutos = produtos; garimpoTop = top; garimpoCronograma = cronograma;
+    garimpoProdutos = produtos; garimpoTop = top; garimpoCronograma = cronograma; garimpoChecklists = checklists;
     garimpoRenderStats(); garimpoRenderTop(); garimpoRenderFilters(); garimpoRenderTable(); garimpoRenderTested();
   }catch(err){
-    document.getElementById('garimpo-tbody').innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--red);">Erro ao carregar: ${err.message}</td></tr>`;
+    document.getElementById('garimpo-tbody').innerHTML = `<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--red);">Erro ao carregar: ${err.message}</td></tr>`;
   }
+}
+
+function garimpoBadgeTexto(produto) {
+  const c = (garimpoChecklists||[]).find(x=>x.produto===produto);
+  if (!c) return 'não avaliado';
+  return c.aprovado ? '✅ Aprovado' : `${c.percentual}% avaliado`;
 }
 
 function garimpoTestedMap(){
@@ -557,32 +567,71 @@ function garimpoRenderTop(){
   if(!garimpoTop.length){ document.getElementById('garimpo-top-grid').innerHTML = '<p style="color:var(--muted);font-size:12px;">Nenhum produto priorizado ainda.</p>'; return; }
   const latest = garimpoTop.reduce((max,t)=> t.data_indicacao>max ? t.data_indicacao : max, garimpoTop[0].data_indicacao);
   document.getElementById('garimpo-top-date').textContent = `rodada de ${garimpoFmtDate(latest)}`;
-  const top7 = garimpoTop.filter(t=>t.data_indicacao===latest).sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0)).slice(0,7);
-  document.getElementById('garimpo-top-grid').innerHTML = top7.map((t,i)=>`
-    <div style="border:1px solid var(--border);border-radius:var(--r);padding:12px;background:var(--bg);">
-      <span class="badge b-camp">#${i+1}</span>
-      <div style="font-weight:700;font-size:13px;margin:8px 0 4px;">${t.produto}</div>
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">${t.justificativa||''}</div>
-      <div style="display:flex;gap:14px;font-family:var(--mono);font-size:12px;">
-        <span>CPA <b style="color:#2563eb;">R$${parseFloat(t.cpa_maximo).toFixed(2)}</b></span>
-        <span>Vendas <b>${garimpoFmtNum(t.vendas)}</b></span>
+  const rodada = garimpoTop.filter(t=>t.data_indicacao===latest);
+
+  const cotas = { evergreen: 5, sazonal_data: 3, sazonal_estacao: 2 };
+  const rotulo = { evergreen: '🌱 Evergreen', sazonal_data: '🎯 Sazonal · Data', sazonal_estacao: '☀️ Sazonal · Estação' };
+  let html = '';
+  Object.keys(cotas).forEach(tipo=>{
+    const itens = rodada.filter(t=>(t.tipo||'evergreen')===tipo)
+                         .sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0))
+                         .slice(0,cotas[tipo]);
+    html += `<div style="grid-column:1/-1;font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:${html?'10px':'0'} 0 -2px;">${rotulo[tipo]} (${itens.length}/${cotas[tipo]})</div>`;
+    html += itens.map((t,i)=>`
+      <div style="border:1px solid var(--border);border-radius:var(--r);padding:12px;background:var(--bg);">
+        <span class="badge b-camp">#${i+1}</span>
+        <div style="font-weight:700;font-size:13px;margin:8px 0 4px;">${t.produto}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">${t.justificativa||''}</div>
+        <div style="display:flex;gap:14px;font-family:var(--mono);font-size:12px;">
+          <span>CPA <b style="color:#2563eb;">R$${parseFloat(t.cpa_maximo).toFixed(2)}</b></span>
+          <span>Vendas <b>${garimpoFmtNum(t.vendas)}</b></span>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
+    if(!itens.length) html += `<div style="color:var(--muted);font-size:11.5px;padding:8px 0;">Nenhum produto ${rotulo[tipo].split(' ').slice(1).join(' ').toLowerCase()} nesta rodada.</div>`;
+  });
+  document.getElementById('garimpo-top-grid').innerHTML = html;
 }
 
 function garimpoRenderFilters(){
   const tested = garimpoTestedMap();
   const pool = garimpoProdutos.filter(p=>!tested[p.produto]);
   const nichos = ["Todos", ...new Set(pool.map(p=>p.nicho).filter(Boolean))];
+  const tipos = [
+    { v:'Todos', l:'Todos os tipos' },
+    { v:'evergreen', l:'🌱 Evergreen' },
+    { v:'sazonal_data', l:'🎯 Sazonal · Data' },
+    { v:'sazonal_estacao', l:'☀️ Sazonal · Estação' },
+  ];
+  document.getElementById('garimpo-filters-tipo').innerHTML = tipos.map(t=>
+    `<button class="filter-btn ${t.v===garimpoActiveTipo?'on':''}" onclick="garimpoActiveTipo='${t.v}';garimpoRenderFilters();garimpoRenderTable();">${t.l}</button>`
+  ).join('');
   document.getElementById('garimpo-filters').innerHTML = nichos.map(n=>
     `<button class="filter-btn ${n===garimpoActiveFilter?'on':''}" onclick="garimpoActiveFilter='${n.replace(/'/g,"\\'")}';garimpoRenderFilters();garimpoRenderTable();">${n}</button>`
   ).join('');
 }
 
-function garimpoRenderTable(){
+function garimpoMontarPool20(){
   const tested = garimpoTestedMap();
-  let list = garimpoProdutos.filter(p=>!tested[p.produto]);
+  const disponiveis = garimpoProdutos.filter(p=>!tested[p.produto]);
+  const cotas = { evergreen: 10, sazonal_data: 6, sazonal_estacao: 4 };
+  let pool = [];
+  Object.keys(cotas).forEach(tipo=>{
+    const grupo = disponiveis.filter(p=>(p.tipo||'evergreen')===tipo)
+                              .sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0))
+                              .slice(0,cotas[tipo]);
+    pool = pool.concat(grupo);
+  });
+  return pool;
+}
+
+const GARIMPO_TIPO_ROTULO = { evergreen:'🌱 Evergreen', sazonal_data:'🎯 Sazonal·Data', sazonal_estacao:'☀️ Sazonal·Estação' };
+
+function garimpoRenderTable(){
+  let list = garimpoMontarPool20(); // pool fixo: 10 evergreen + 6 sazonal-data + 4 sazonal-estação
+  const poolTotal = list.length;
+
+  if(garimpoActiveTipo!=="Todos") list = list.filter(p=>(p.tipo||'evergreen')===garimpoActiveTipo);
   if(garimpoActiveFilter!=="Todos") list = list.filter(p=>p.nicho===garimpoActiveFilter);
   const q = (document.getElementById('garimpo-filter-text')?.value || garimpoFreeText).trim().toLowerCase();
   if(q){ list = list.filter(p=>{ const v=p[garimpoFreeField]; return v!=null && String(v).toLowerCase().includes(q); }); }
@@ -599,13 +648,12 @@ function garimpoRenderTable(){
     list = [...list].sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0));
   }
 
-  const totalPool = garimpoProdutos.filter(p=>!tested[p.produto]).length;
-  list = list.slice(0,15);
-  document.getElementById('garimpo-count-label').textContent = `mostrando ${list.length} de ${totalPool} não testados`;
+  document.getElementById('garimpo-count-label').textContent = `mostrando ${list.length} de ${poolTotal} (cota: 10 evergreen + 6 sazonal-data + 4 sazonal-estação)`;
 
   document.getElementById('garimpo-tbody').innerHTML = list.map(p=>`
     <tr class="data-row">
       <td style="text-align:left;"><div style="font-weight:600;">${p.produto}</div><div style="color:var(--muted);font-size:11px;">${p.loja||''}</div></td>
+      <td style="font-size:11px;white-space:nowrap;">${GARIMPO_TIPO_ROTULO[p.tipo||'evergreen']}${p.janela_ideal?`<div style="color:var(--muted);font-size:10px;">${p.janela_ideal}</div>`:''}</td>
       <td>${p.nicho||'—'}</td>
       <td>${p.preco||'—'}</td>
       <td>${p.comissao_percentual||'—'}%</td>
@@ -615,8 +663,12 @@ function garimpoRenderTable(){
       <td style="font-family:var(--mono);font-size:11px;">${garimpoFmtDate(p.data_indicacao)}</td>
       <td>${p.link ? `<a href="${p.link}" target="_blank" style="color:#2563eb;">abrir ↗</a>` : '<span style="color:var(--red);font-size:11px;">sem link</span>'}</td>
       <td><input type="date" data-produto="${p.produto.replace(/"/g,'&quot;')}" class="garimpo-start-date date-input" onchange="garimpoSaveStart(this)"></td>
+      <td>
+        <button class="act-btn" style="font-size:11px;padding:4px 10px;" onclick="garimpoAbrirChecklist('${p.produto.replace(/'/g,"\\'")}')">📋 Avaliar</button>
+        <div data-avaliar="${p.produto.replace(/"/g,'&quot;')}" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px;">${garimpoBadgeTexto(p.produto)}</div>
+      </td>
     </tr>
-  `).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto com esse filtro.</td></tr>';
+  `).join('') || '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto com esse filtro.</td></tr>';
 }
 
 async function garimpoSaveStart(inp){
@@ -660,6 +712,166 @@ async function garimpoSaveField(el){
 
 document.getElementById('garimpo-filter-field')?.addEventListener('change', e=>{ garimpoFreeField = e.target.value; garimpoRenderTable(); });
 document.getElementById('garimpo-filter-text')?.addEventListener('input', e=>{ garimpoFreeText = e.target.value; garimpoRenderTable(); });
+</script>
+
+<!-- Modal do checklist de avaliação de produto (namespace garimpo, isolado) -->
+<div class="modal-bg" id="garimpo-modal-bg">
+  <div class="modal" style="width:640px;max-height:85vh;overflow-y:auto;">
+    <button class="modal-close" onclick="garimpoFecharChecklist()">✕</button>
+    <h3 id="garimpo-modal-titulo">Avaliação de produto</h3>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <div style="flex:1;height:8px;background:var(--bg3);border-radius:6px;overflow:hidden;">
+        <div id="garimpo-modal-bar" style="height:100%;background:#2563eb;width:0%;transition:width .2s;"></div>
+      </div>
+      <span id="garimpo-modal-pct" style="font-family:var(--mono);font-size:12px;font-weight:700;">0%</span>
+    </div>
+    <div id="garimpo-modal-body"></div>
+    <div id="garimpo-modal-veredito" style="display:none;margin-top:14px;padding:14px;border-radius:10px;border:1px solid var(--green-bdr);background:var(--green-bg);text-align:center;">
+      <div style="font-weight:700;color:var(--green);">✅ Produto Aprovado!</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Todos os critérios foram avaliados. Pronto pra ir ao ar!</div>
+    </div>
+  </div>
+</div>
+<script>
+// ── Checklist de avaliação de produto (baseado nas aulas MGD) — namespace garimpoChk ──
+const GARIMPO_CHK_DATA = [
+  { id:'s1', step:'01', title:'Potencial de Venda', sub:'O produto tem demanda real?', items:[
+    { text:'Resolve um problema que acontece TODO DIA?', note:'Quanto mais frequente a dor, maior a venda.', critical:true },
+    { text:'Resolve o problema de muita gente?', note:'Quanto maior o público, maior o potencial.' },
+    { text:'Tem potencial de viralização / quebra de padrão?', note:'Visual que prende, apresentado de forma diferente do normal.' },
+    { text:'O preço é tão atrativo que seria "burrice não comprar"?', note:'Ex: kit de esponja por R$10, conjunto de treino baratíssimo.' },
+    { text:'É desejável o suficiente para justificar o valor?', note:'Ex: fechadura inteligente — o preço precisa ser justificado pelo desejo.' },
+    { text:'Está dentro de um nicho de alto potencial?', note:'Moda Feminina, Saúde/Beleza, Pet, Kids, Casa/Decoração (público majoritariamente mulheres 25-65+). Eletrônicos entra na lista, mas com ressalva do curso: alta busca, porém muita concorrência.' },
+  ]},
+  { id:'s2', step:'02', title:'Sazonalidade e Tendência', sub:'Esse produto vende AGORA?', items:[
+    { text:'Está alinhado com a sazonalidade atual?', note:'Verão → moda praia, protetor solar. Inverno → cobertores, aquecedores.', critical:true },
+    { text:'Está em tendência ou tem potencial viral?', note:'Produtos em alta convertem mais facilmente.' },
+    { text:'Classifiquei como Evergreen ou Sazonal?', note:'Meta: 50% evergreen (rodam meses) + 30% sazonal por data + 20% sazonal por estação.', auto:'tipo' },
+  ]},
+  { id:'s3', step:'03', title:'Comissão e Rentabilidade', sub:'Vale o investimento em anúncio?', items:[
+    { text:'Comissão acima de 10% ou valor absoluto que justifique o gasto?', note:'Comissão mínima garante sua margem de lucro.', critical:true, auto:'comissao' },
+    { text:'Escolhi o fornecedor com melhor relação comissão × avaliações?', note:'Não é só a maior comissão — a loja precisa ter boa reputação.' },
+  ]},
+  { id:'s4', step:'04', title:'Avaliações e Prova Social', sub:'O produto tem credibilidade?', items:[
+    { text:'Nota acima de 4 estrelas (ideal 4.5+)?', note:'Avaliações positivas = prova social indispensável para os criativos.', critical:true, auto:'nota' },
+    { text:'Há comentários detalhados de clientes?', note:'Comentários detalhados passam mais confiança e ajudam nos criativos.' },
+    { text:'Existem fotos/vídeos reais de clientes usando o produto?', note:'Conteúdo real de compradores aumenta muito a conversão.' },
+    { text:'A loja tem credibilidade? (Loja Oficial ou Loja Indicada?)', note:'Loja oficial = mais segurança para o comprador.' },
+    { text:'A quantidade de vendas do produto é expressiva?', note:'Muitas vendas = produto validado pelo mercado.', auto:'vendas' },
+  ]},
+  { id:'s5', step:'05', title:'Logística e Estoque', sub:'O produto está pronto para escalar?', items:[
+    { text:'Estoque suficiente para não esgotar com os anúncios?', note:'Produto esgotado = verba de anúncio jogada fora.', critical:true },
+    { text:'Tem frete grátis disponível?', note:'Frete grátis é um gatilho poderoso que aumenta a conversão.' },
+    { text:'Há cupons de loja ou promoção ativa?', note:'Descontos e cupons aumentam drasticamente a conversão.' },
+    { text:'A loja tem diversidade de produtos?', note:'Loja com variedade indica estrutura e credibilidade.' },
+  ]},
+  { id:'s6', step:'06', title:'Preço e Competitividade', sub:'O preço está competitivo?', items:[
+    { text:'O preço é competitivo comparado a outros sellers da mesma categoria?', note:'Preço competitivo afeta diretamente a conversão.', critical:true },
+    { text:'A diferença de preço em relação a lojas físicas é visível?', note:'Mostrar essa diferença no criativo é um gatilho poderoso.' },
+    { text:'Já negociei com o vendedor via chat? (amostras, materiais exclusivos)', note:'Peça amostra para gravar criativos ou materiais exclusivos da loja.' },
+  ]},
+  { id:'s7', step:'07', title:'Rastreamento e Configuração', sub:'Está tudo pronto para rodar?', items:[
+    { text:'Renomeei o link com o mesmo nome da campanha no Meta?', note:'Ex: campanha "blusa01x07dez" → SUBID também "blusa01x07dez".', critical:true },
+    { text:'Tenho o ID do produto para colocar na tela (se for TOP 3/TOP 5)?', note:'IDs visíveis facilitam a automação de envio de links.' },
+    { text:'A automação para envio do link está configurada?', note:'SEMPRE ter automação enviando o link para quem comentar/interagir.' },
+  ], alerta:'⚠️ Atenção ao SUBID: se a campanha se chama "blusa01x07dez", o SUBID também deve ser "blusa01x07dez". Isso garante que você rastreie exatamente qual criativo gerou a venda.' },
+];
+
+let garimpoChkProdutoAtual = null;
+let garimpoChkRespostas = {};
+
+function garimpoAbrirChecklist(produtoNome) {
+  const p = garimpoProdutos.find(x => x.produto === produtoNome);
+  if (!p) return;
+  garimpoChkProdutoAtual = produtoNome;
+  const salvo = (garimpoChecklists || []).find(c => c.produto === produtoNome);
+  garimpoChkRespostas = salvo ? JSON.parse(JSON.stringify(salvo.respostas || {})) : {};
+
+  // Pré-preenchimento automático com base nos dados já conhecidos do produto
+  GARIMPO_CHK_DATA.forEach(sec => {
+    if (!garimpoChkRespostas[sec.id]) garimpoChkRespostas[sec.id] = new Array(sec.items.length).fill(false);
+    sec.items.forEach((item, i) => {
+      if (garimpoChkRespostas[sec.id][i]) return; // não sobrescreve o que já foi marcado manualmente
+      if (item.auto === 'comissao') {
+        const pct = parseFloat(p.comissao_percentual) || 0;
+        const val = parseFloat(p.cpa_maximo) || 0;
+        if (pct >= 10 || val >= 10) garimpoChkRespostas[sec.id][i] = true;
+      }
+      if (item.auto === 'nota' && parseFloat(p.nota) >= 4) garimpoChkRespostas[sec.id][i] = true;
+      if (item.auto === 'vendas' && (p.vendas || 0) >= 1000) garimpoChkRespostas[sec.id][i] = true;
+      if (item.auto === 'tipo' && p.tipo) garimpoChkRespostas[sec.id][i] = true;
+    });
+  });
+
+  document.getElementById('garimpo-modal-titulo').textContent = `Avaliação — ${p.produto}`;
+  garimpoRenderChecklist();
+  document.getElementById('garimpo-modal-bg').classList.add('open');
+}
+
+function garimpoFecharChecklist() {
+  document.getElementById('garimpo-modal-bg').classList.remove('open');
+}
+
+function garimpoToggleItem(secId, idx) {
+  garimpoChkRespostas[secId][idx] = !garimpoChkRespostas[secId][idx];
+  garimpoRenderChecklist();
+  garimpoSalvarChecklist();
+}
+
+function garimpoRenderChecklist() {
+  let total = 0, checked = 0;
+  GARIMPO_CHK_DATA.forEach(sec => { total += sec.items.length; checked += (garimpoChkRespostas[sec.id]||[]).filter(Boolean).length; });
+  const pct = total ? Math.round((checked/total)*100) : 0;
+  document.getElementById('garimpo-modal-bar').style.width = pct + '%';
+  document.getElementById('garimpo-modal-pct').textContent = pct + '% (' + checked + '/' + total + ')';
+  document.getElementById('garimpo-modal-veredito').style.display = pct === 100 ? 'block' : 'none';
+
+  document.getElementById('garimpo-modal-body').innerHTML = GARIMPO_CHK_DATA.map(sec => `
+    <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="padding:10px 14px;background:var(--bg3);font-weight:700;font-size:13px;display:flex;justify-content:space-between;">
+        <span>${sec.step} · ${sec.title}</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">${(garimpoChkRespostas[sec.id]||[]).filter(Boolean).length}/${sec.items.length}</span>
+      </div>
+      <div style="padding:6px 10px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--border);">${sec.sub}</div>
+      ${sec.items.map((item,i)=>`
+        <div onclick="garimpoToggleItem('${sec.id}',${i})" style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;${item.critical?'background:rgba(239,68,68,.04);':''}">
+          <div style="width:18px;height:18px;border-radius:5px;border:1.5px solid ${garimpoChkRespostas[sec.id][i]?'#2563eb':'var(--border)'};background:${garimpoChkRespostas[sec.id][i]?'#2563eb':'transparent'};color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">${garimpoChkRespostas[sec.id][i]?'✓':''}</div>
+          <div style="flex:1;">
+            <div style="font-size:12.5px;font-weight:600;">${item.text}</div>
+            ${item.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${item.note}</div>` : ''}
+          </div>
+          ${item.critical ? '<span style="font-size:9.5px;background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:10px;white-space:nowrap;">crítico</span>' : ''}
+        </div>
+      `).join('')}
+      ${sec.alerta ? `<div style="padding:10px 14px;font-size:11px;background:var(--yellow-bg);color:var(--yellow);">${sec.alerta}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function garimpoSalvarChecklist() {
+  let total = 0, checked = 0;
+  GARIMPO_CHK_DATA.forEach(sec => { total += sec.items.length; checked += (garimpoChkRespostas[sec.id]||[]).filter(Boolean).length; });
+  const pct = total ? Math.round((checked/total)*100) : 0;
+  const body = { produto: garimpoChkProdutoAtual, respostas: garimpoChkRespostas, percentual: pct, aprovado: pct===100, atualizado_em: new Date().toISOString() };
+  try {
+    await fetch(`${GARIMPO_URL}/rest/v1/garimpo_checklist?on_conflict=produto`, {
+      method:'POST',
+      headers:{ apikey:GARIMPO_KEY, Authorization:`Bearer ${GARIMPO_KEY}`, 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(body)
+    });
+    const idx = (garimpoChecklists||[]).findIndex(c=>c.produto===garimpoChkProdutoAtual);
+    if (idx>=0) garimpoChecklists[idx] = body; else (garimpoChecklists=garimpoChecklists||[]).push(body);
+    garimpoAtualizarBadgeAvaliacao(garimpoChkProdutoAtual);
+  } catch(err) { console.error('Erro ao salvar checklist:', err); }
+}
+
+function garimpoAtualizarBadgeAvaliacao(produto) {
+  const c = (garimpoChecklists||[]).find(x=>x.produto===produto);
+  const el = document.querySelector(`[data-avaliar="${CSS.escape(produto)}"]`);
+  if (!el || !c) return;
+  el.textContent = c.aprovado ? '✅ Aprovado' : `${c.percentual}%`;
+  el.style.color = c.aprovado ? 'var(--green)' : 'var(--muted)';
+}
 </script>
 
 <!-- ══════════════════════════════════════════

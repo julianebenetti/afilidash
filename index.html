@@ -2400,6 +2400,45 @@ function _mdtProcessar(rows, periodoDias, hoje) {
   return { periodoDias, geradoEm: new Date(), totalAnuncios: anuncios.length, ranking, rankingBM, consistencia, provados, promissores, cpcMediana };
 }
 
+// Taxa de validação por dia de lançamento — usa o MESMO motor MGD oficial
+// (_primeiroDiaValidacao, _analisarMGD) já usado na Análise MGD. É uma
+// pergunta DIFERENTE da entrega Meta acima: aqui é "esse dia costuma dar
+// campanha que realmente vende (valida na Shopee)?", não "esse dia entrega
+// tráfego barato?". As duas coisas podem apontar pra dias diferentes.
+function _mdtCalcularValidacao(periodoDias, hoje) {
+  const limiteRecente = new Date(hoje); limiteRecente.setDate(limiteRecente.getDate() - 4);
+  const limiteAntigo  = new Date(hoje); limiteAntigo.setDate(limiteAntigo.getDate() - periodoDias);
+
+  const sids = Object.keys(CFG_CAMPANHAS).filter(sid => {
+    const d0str = _primeiraDataGasto(sid);
+    if (!d0str) return false;
+    const d0 = new Date(d0str + 'T00:00:00');
+    return d0 >= limiteAntigo && d0 <= limiteRecente;
+  });
+
+  const porDia = {};
+  MDT_DIAS_SEMANA.forEach(d => porDia[d] = { dia: d, testados: 0, validados: 0, reprovados: 0 });
+
+  sids.forEach(sid => {
+    const d0str = _primeiraDataGasto(sid);
+    const d0 = new Date(d0str + 'T00:00:00');
+    const diaSemana = MDT_DIAS_SEMANA[d0.getDay()];
+    const infoHoje = _analisarMGD(sid);
+    const valido = _primeiroDiaValidacao(sid) != null;
+    const reprovado = !valido && (infoHoje.veredito === 'DESATIVAR' || infoHoje.veredito === 'PAUSAR');
+    const p = porDia[diaSemana];
+    p.testados++;
+    if (valido) p.validados++;
+    if (reprovado) p.reprovados++;
+  });
+
+  const ranking = Object.values(porDia).filter(p => p.testados > 0).map(p => ({
+    ...p, taxa: p.testados > 0 ? (p.validados / p.testados) * 100 : 0,
+  })).sort((a, b) => b.taxa - a.taxa);
+
+  return { ranking, totalTestados: sids.length };
+}
+
 async function _mdtCarregarEProcessar(periodoDias) {
   MDT_PERIODO_ATUAL = periodoDias;
   document.getElementById('mdt-btn-30')?.style.setProperty('border-color', periodoDias === 30 ? '#2563eb' : 'var(--border)');
@@ -2414,8 +2453,14 @@ async function _mdtCarregarEProcessar(periodoDias) {
   const de = new Date(hoje); de.setDate(de.getDate() - periodoDias - 1);
   const rows = await _carregarPeriodoMdt(_mdtFmtData(de), _mdtFmtData(hoje));
   MDT_CACHE[periodoDias] = _mdtProcessar(rows, periodoDias, hoje);
+  MDT_CACHE[periodoDias].validacao = _mdtCalcularValidacao(periodoDias, hoje);
   MDT_CARREGANDO = false;
   renderMdt();
+}
+
+function _mdtToggleLeitura(i) {
+  const el = document.getElementById('mdt-leitura-' + i);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
 function renderMdt() {
@@ -2447,14 +2492,18 @@ function renderMdt() {
   // Ranking de dias
   const linhasRanking = res.ranking.map((p, i) => {
     const cls = classeLinha(i, res.ranking.length);
-    return `<tr style="background:${corFundo[cls] || 'transparent'};">
+    const leitura = leituraDia(p, i, res.ranking.length);
+    const bg = corFundo[cls] || 'transparent';
+    return `<tr style="background:${bg};cursor:pointer;" onclick="_mdtToggleLeitura(${i})" title="${esc(leitura)}">
       <td style="font-weight:700;">${medalha(i)}</td>
-      <td><b>${esc(p.dia)}</b></td>
+      <td><b>${esc(p.dia)}</b> <span style="font-size:10px;color:var(--muted);" title="${esc(leitura)}">ℹ️</span></td>
       <td>${p.anuncios}</td>
       <td>R$ ${r2(p.cpc)}</td>
       <td>${p.cpm != null ? 'R$ ' + r2(p.cpm) : '—'}</td>
       <td>${p.ctr != null ? r2(p.ctr) + '%' : '—'}</td>
-      <td style="font-size:12px;color:var(--muted);">${esc(leituraDia(p, i, res.ranking.length))}</td>
+    </tr>
+    <tr id="mdt-leitura-${i}" style="display:none;background:${bg};">
+      <td colspan="6" style="font-size:12px;color:var(--muted);padding:6px 12px 12px;">${esc(leitura)}</td>
     </tr>`;
   }).join('');
 
@@ -2491,6 +2540,23 @@ function renderMdt() {
   const linhasProvados = res.provados.map(linhaAnuncio).join('') || '<tr><td colspan="6" style="color:var(--muted);">Nenhum anúncio se encaixa nesse critério ainda nesse período.</td></tr>';
   const linhasPromissores = res.promissores.map(linhaAnuncio).join('') || '<tr><td colspan="6" style="color:var(--muted);">Nenhum anúncio se encaixa nesse critério ainda nesse período.</td></tr>';
 
+  // Taxa de validação por dia (dado real da MGD/Shopee — análise separada da entrega Meta acima)
+  const val = res.validacao || { ranking: [], totalTestados: 0 };
+  const medalhaVal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + 'º';
+  const linhasValidacao = val.ranking.map((p, i) => {
+    const cls = p.testados < 3 ? 'muted' : (i === 0 ? 'gold' : i <= 1 ? 'silver' : (i >= val.ranking.length - 2 ? 'bad' : ''));
+    const bg = corFundo[cls] || 'transparent';
+    return `<tr style="background:${bg};">
+      <td style="font-weight:700;">${medalhaVal(i)}</td>
+      <td><b>${esc(p.dia)}</b></td>
+      <td>${p.testados}${p.testados < 3 ? ' <span style="font-size:10px;color:var(--muted);">(amostra pequena)</span>' : ''}</td>
+      <td>${p.validados}</td>
+      <td style="font-weight:700;">${r2(p.taxa)}%</td>
+      <td>${p.reprovados}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="color:var(--muted);padding:12px;">Sem campanhas com D0–D3 completo nesse período pra avaliar validação.</td></tr>';
+  const melhorDiaValidacao = val.ranking[0]?.dia || null;
+
   el.innerHTML = `
     <div style="font-size:12px;color:var(--muted);margin:12px 0;">
       Baseado em <b>${res.totalAnuncios} anúncios</b> lançados nos últimos ${res.periodoDias} dias (excluindo os últimos 3 dias — ainda sem D0–D3 completo). Métrica: CPC e CPM médios em D0–D3. Não inclui venda/ROAS da Shopee. Atualizado agora.
@@ -2501,7 +2567,7 @@ function renderMdt() {
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
         <thead><tr style="text-align:left;background:var(--bg2);">
           <th style="padding:8px;">#</th><th style="padding:8px;">Dia</th><th style="padding:8px;">Anúncios</th>
-          <th style="padding:8px;">CPC médio D0–D3</th><th style="padding:8px;">CPM médio</th><th style="padding:8px;">CTR médio</th><th style="padding:8px;">Leitura</th>
+          <th style="padding:8px;">CPC médio D0–D3</th><th style="padding:8px;">CPM médio</th><th style="padding:8px;">CTR médio</th>
         </tr></thead>
         <tbody>${linhasRanking}</tbody>
       </table>
@@ -2566,6 +2632,28 @@ function renderMdt() {
         <thead><tr style="text-align:left;background:var(--bg2);"><th style="padding:8px;">Anúncio</th><th style="padding:8px;">BM</th><th style="padding:8px;">Investido</th><th style="padding:8px;">CPC</th><th style="padding:8px;">CTR</th><th style="padding:8px;">Dias ativo</th></tr></thead>
         <tbody>${linhasPromissores}</tbody>
       </table>
+    </div>
+
+    <hr style="margin:32px 0;border:none;border-top:3px double var(--border);">
+
+    <div class="section">
+      <div class="section-title">🎯 PLUS — Taxa de Validação por Dia de Lançamento (dado real da Shopee/MGD)</div>
+      <div style="background:#eef4ff;border-left:4px solid #2563eb;padding:12px 16px;margin:12px 0;border-radius:4px;font-size:12px;">
+        <b>Isso é uma pergunta diferente da análise acima.</b> Ali em cima é "esse dia entrega tráfego barato no Meta?" — aqui é <b>"esse dia costuma dar campanha que realmente valida (vende) na MGD?"</b>.
+        Usa o mesmo motor oficial da Análise MGD (validação permanente a partir do D4). As duas análises podem apontar pra dias diferentes — é normal, e é justamente o que vale comparar.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        <thead><tr style="text-align:left;background:var(--bg2);">
+          <th style="padding:8px;">#</th><th style="padding:8px;">Dia</th><th style="padding:8px;">Testadas</th>
+          <th style="padding:8px;">Validadas</th><th style="padding:8px;">Taxa de validação</th><th style="padding:8px;">Reprovadas</th>
+        </tr></thead>
+        <tbody>${linhasValidacao}</tbody>
+      </table>
+      ${melhorDiaValidacao ? `
+      <div style="background:#f7f9fc;border-left:4px solid #4a76a8;padding:14px 18px;margin:16px 0;border-radius:4px;font-size:13px;">
+        <b>Leitura:</b> <b>${esc(melhorDiaValidacao)}</b> é o dia com maior taxa de validação real no período — compare com o ranking de entrega Meta acima pra ver se são os mesmos dias ou não.
+      </div>` : ''}
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Amostras com menos de 3 campanhas testadas ficam marcadas — taxa de validação com poucos testes pode enganar bastante.</div>
     </div>
   `;
 

@@ -132,7 +132,7 @@ tr.data-row:hover .drill-arrow { color:#2563eb; }
 body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 
 /* ── BADGES ── */
-.badge { display:inline-block; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; white-space:nowrap; }
+.badge { display:inline-block; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; white-space:nowrap; text-transform:uppercase; }
 .b-camp  { background:#166534; color:#fff; }
 .b-bom   { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); }
 .b-med   { background:var(--yellow-bg); color:var(--yellow); }
@@ -794,6 +794,20 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
   <div id="vc-conteudo"></div>
 </div>
 <!-- ══════════════════════════════════════════
+     PÁGINA: MELHOR DIA TRÁFEGO
+══════════════════════════════════════════ -->
+<div class="page" id="page-melhor-dia">
+  <div class="toolbar">
+    <div class="section-title">Melhor Dia Tráfego <button onclick="_abrirAjuda('melhor-dia')" title="Ajuda" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:.6;">ℹ️</button></div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;gap:8px;">
+      <button id="mdt-btn-30" class="act-btn" onclick="_mdtCarregarEProcessar(30)" style="border-color:#2563eb;color:#2563eb;">30 dias</button>
+      <button id="mdt-btn-60" class="act-btn" onclick="_mdtCarregarEProcessar(60)">60 dias</button>
+    </div>
+  </div>
+  <div id="mdt-corpo"></div>
+</div>
+<!-- ══════════════════════════════════════════
      PÁGINA: GRUPOS WHATS
 ══════════════════════════════════════════ -->
 <div class="page" id="page-whats">
@@ -1444,6 +1458,7 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
 </div><!-- /page-config -->
 
 <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ═══════════════════════════════════════════
 // SUPABASE — leitura direta (chaves carregadas do servidor)
@@ -2200,6 +2215,378 @@ async function _carregarPeriodoMgv(de, ate) {
   } catch(e) {
     console.error('Falha ao carregar dados MGV:', e.message);
     return [];
+  }
+}
+
+// Carregamento DEDICADO para a aba "Melhor Dia Tráfego" — busca impressões e
+// cliques do meta_ads (colunas que existem na tabela mas nenhuma outra aba usa),
+// pra calcular CPC/CPM/CTR por dia de lançamento. Não afeta DADOS nem nenhuma
+// outra parte do app.
+async function _carregarPeriodoMdt(de, ate) {
+  try {
+    await _inicializarSupabase();
+    if (!SB_BASE) throw new Error('Supabase não inicializado');
+    const sbGetAll = async (path) => {
+      let todos = [], offset = 0;
+      const PAGE = 1000;
+      while (true) {
+        const sep  = path.includes('?') ? '&' : '?';
+        const rows = await sbGet(`${path}${sep}limit=${PAGE}&offset=${offset}`);
+        todos = todos.concat(rows);
+        if (rows.length < PAGE) break;
+        offset += PAGE;
+        if (offset > 500000) break;
+      }
+      return todos;
+    };
+    const SEL = 'data,conta,campanha,gasto,impressoes,cliques_link,conta_meta_id';
+    const rows = await sbGetAll(`/meta_ads?data=gte.${de}&data=lte.${ate}&select=${SEL}&order=data.asc`);
+    console.log(`✓ MDT carregado [${de} → ${ate}]:`, rows.length, 'registros');
+    return rows;
+  } catch(e) {
+    console.error('Falha ao carregar dados MDT:', e.message);
+    return [];
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MELHOR DIA TRÁFEGO — descobre em qual dia da semana o lançamento
+// de um anúncio novo tende a entregar mais barato (CPC/CPM) e mais
+// qualificado (CTR), nos primeiros 4 dias de veiculação (D0–D3).
+// Só usa dado do Meta (gasto, impressões, cliques) — sem cruzar com
+// venda/ROAS da Shopee, por decisão explícita.
+// ══════════════════════════════════════════════════════════════
+const MDT_DIAS_SEMANA = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+let MDT_CACHE = {};          // periodoDias -> resultado já processado (evita reprocessar ao trocar de aba e voltar)
+let MDT_PERIODO_ATUAL = 30;
+let MDT_CARREGANDO = false;
+
+function _mdtFmtData(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// Agrupamento: usa o rótulo "BM" cadastrado em Configuração → Conta Meta Ads.
+// Se não tiver rótulo, agrupa pelo nome da própria conta (nunca mistura tudo
+// numa coisa só sem querer).
+function _mdtBmDaConta(contaNome, contaMetaId) {
+  const cfg = (CFG_META || []).find(c => c.id === contaMetaId);
+  if (cfg && cfg.bm && cfg.bm.trim()) return cfg.bm.trim();
+  return contaNome || 'Conta desconhecida';
+}
+
+function _mdtProcessar(rows, periodoDias, hoje) {
+  // Índice por anúncio real (conta + nome do anúncio/campanha)
+  const porAnuncio = {};
+  rows.forEach(r => {
+    const chave = (r.conta_meta_id||'—') + '|' + (r.campanha||'—');
+    if (!porAnuncio[chave]) porAnuncio[chave] = { conta: r.conta, contaMetaId: r.conta_meta_id, campanha: r.campanha, porData: {} };
+    porAnuncio[chave].porData[r.data] = {
+      gasto: Number(r.gasto) || 0,
+      impressoes: Number(r.impressoes) || 0,
+      cliques: Number(r.cliques_link) || 0,
+    };
+  });
+
+  // D0 precisa ser no máximo "hoje - 4" pra ter os 4 dias (D0..D3) já
+  // completos — nunca julga um anúncio lançado nos últimos 3 dias.
+  const limiteRecente = new Date(hoje); limiteRecente.setDate(limiteRecente.getDate() - 4);
+  const limiteAntigo  = new Date(hoje); limiteAntigo.setDate(limiteAntigo.getDate() - periodoDias);
+
+  const anuncios = [];
+  Object.values(porAnuncio).forEach(a => {
+    const datasComGasto = Object.keys(a.porData).filter(d => a.porData[d].gasto > 0).sort();
+    if (!datasComGasto.length) return;
+    const d0str = datasComGasto[0];
+    const d0 = new Date(d0str + 'T00:00:00');
+    if (d0 < limiteAntigo || d0 > limiteRecente) return;
+
+    // Janela D0..D3
+    let g = 0, im = 0, cl = 0;
+    for (let k = 0; k < 4; k++) {
+      const dd = new Date(d0); dd.setDate(dd.getDate() + k);
+      const v = a.porData[_mdtFmtData(dd)];
+      if (v) { g += v.gasto; im += v.impressoes; cl += v.cliques; }
+    }
+    // Investido e atividade no período INTEIRO carregado (não só D0-3) — usado
+    // no ranking de "quais anúncios reinvestir"
+    let gTot = 0, imTot = 0, clTot = 0, diasAtivos = 0;
+    Object.values(a.porData).forEach(v => { gTot += v.gasto; imTot += v.impressoes; clTot += v.cliques; if (v.gasto > 0) diasAtivos++; });
+
+    anuncios.push({
+      campanha: a.campanha, conta: a.conta, bm: _mdtBmDaConta(a.conta, a.contaMetaId),
+      d0: d0str, diaSemana: MDT_DIAS_SEMANA[d0.getDay()],
+      g, im, cl, gTot, imTot, clTot, diasAtivos,
+      cpcTotal: clTot > 0 ? gTot / clTot : null,
+      ctrTotal: imTot > 0 ? (clTot / imTot) * 100 : null,
+    });
+  });
+
+  // ── Agrega por dia da semana (médias PONDERADAS pelo gasto, não média
+  // simples de CPC — mesmo critério do relatório de referência) ──
+  const porDia = {};
+  MDT_DIAS_SEMANA.forEach(d => porDia[d] = { dia: d, anuncios: 0, gasto: 0, impressoes: 0, cliques: 0 });
+  anuncios.forEach(a => {
+    const p = porDia[a.diaSemana];
+    p.anuncios++; p.gasto += a.g; p.impressoes += a.im; p.cliques += a.cl;
+  });
+  const ranking = Object.values(porDia).filter(p => p.anuncios > 0).map(p => ({
+    ...p,
+    cpc: p.cliques > 0 ? p.gasto / p.cliques : null,
+    cpm: p.impressoes > 0 ? (p.gasto / p.impressoes) * 1000 : null,
+    ctr: p.impressoes > 0 ? (p.cliques / p.impressoes) * 100 : null,
+  })).sort((x, y) => (x.cpc ?? Infinity) - (y.cpc ?? Infinity));
+
+  // ── Agrega por BM ──
+  const porBM = {};
+  anuncios.forEach(a => {
+    if (!porBM[a.bm]) porBM[a.bm] = { bm: a.bm, anuncios: 0, gasto: 0, impressoes: 0, cliques: 0 };
+    const p = porBM[a.bm];
+    p.anuncios++; p.gasto += a.g; p.impressoes += a.im; p.cliques += a.cl;
+  });
+  const rankingBM = Object.values(porBM).map(p => ({
+    ...p,
+    cpc: p.cliques > 0 ? p.gasto / p.cliques : null,
+    ctr: p.impressoes > 0 ? (p.cliques / p.impressoes) * 100 : null,
+  })).sort((x, y) => (x.cpc ?? Infinity) - (y.cpc ?? Infinity));
+
+  // ── Consistência dia x BM (só entra na tabela se pelo menos 1 BM tiver 3+
+  // anúncios naquele dia — evita concluir algo de amostra ínfima) ──
+  const porDiaBM = {}; // dia|bm -> {gasto,impressoes,cliques,anuncios}
+  anuncios.forEach(a => {
+    const k = a.diaSemana + '|' + a.bm;
+    if (!porDiaBM[k]) porDiaBM[k] = { gasto: 0, impressoes: 0, cliques: 0, anuncios: 0 };
+    const p = porDiaBM[k];
+    p.anuncios++; p.gasto += a.g; p.impressoes += a.im; p.cliques += a.cl;
+  });
+  const bmsExistentes = Object.keys(porBM);
+  const consistencia = ranking.map(diaInfo => {
+    const porBmDoDia = bmsExistentes.map(bm => {
+      const p = porDiaBM[diaInfo.dia + '|' + bm];
+      if (!p || p.anuncios < 3 || p.cliques <= 0) return null;
+      return { bm, cpc: p.gasto / p.cliques, anuncios: p.anuncios };
+    }).filter(Boolean);
+    let leitura, cor;
+    if (porBmDoDia.length < 2) {
+      leitura = porBmDoDia.length === 1 ? `só dados de ${porBmDoDia[0].bm}` : 'amostra insuficiente';
+      cor = 'muted';
+    } else {
+      const cpcs = porBmDoDia.map(x => x.cpc);
+      const razao = Math.max(...cpcs) / Math.min(...cpcs);
+      const rankPos = ranking.findIndex(r => r.dia === diaInfo.dia);
+      if (razao > 1.4) { leitura = 'diverge muito entre BMs'; cor = 'warn'; }
+      else if (rankPos < Math.ceil(ranking.length / 3)) { leitura = 'bom nas duas'; cor = 'ok'; }
+      else if (rankPos >= ranking.length - Math.ceil(ranking.length / 3)) { leitura = 'ruim nas duas'; cor = 'bad'; }
+      else { leitura = 'mediano nas duas'; cor = 'muted'; }
+    }
+    return { dia: diaInfo.dia, porBm: porBmDoDia, leitura, cor };
+  });
+
+  // ── Ranking de anúncios pra reinvestir ──
+  const comCpc = anuncios.filter(a => a.cpcTotal != null && a.gTot > 0);
+  const investidos = comCpc.map(a => a.gTot).sort((x, y) => x - y);
+  const cpcs = comCpc.map(a => a.cpcTotal).sort((x, y) => x - y);
+  const pct = (arr, p) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] : 0;
+  const investidoP75 = pct(investidos, 0.75);
+  const investidoMediana = pct(investidos, 0.5);
+  const cpcMediana = pct(cpcs, 0.5);
+
+  const provados = comCpc
+    .filter(a => a.gTot >= investidoP75 && a.cpcTotal <= cpcMediana && a.diasAtivos >= 10)
+    .sort((x, y) => y.gTot - x.gTot)
+    .slice(0, 12);
+  const promissores = comCpc
+    .filter(a => a.cpcTotal <= cpcMediana && a.gTot < investidoMediana && !provados.includes(a))
+    .sort((x, y) => x.cpcTotal - y.cpcTotal)
+    .slice(0, 10);
+
+  return { periodoDias, geradoEm: new Date(), totalAnuncios: anuncios.length, ranking, rankingBM, consistencia, provados, promissores, cpcMediana };
+}
+
+async function _mdtCarregarEProcessar(periodoDias) {
+  MDT_PERIODO_ATUAL = periodoDias;
+  document.getElementById('mdt-btn-30')?.style.setProperty('border-color', periodoDias === 30 ? '#2563eb' : 'var(--border)');
+  document.getElementById('mdt-btn-30')?.style.setProperty('color', periodoDias === 30 ? '#2563eb' : 'var(--text)');
+  document.getElementById('mdt-btn-60')?.style.setProperty('border-color', periodoDias === 60 ? '#2563eb' : 'var(--border)');
+  document.getElementById('mdt-btn-60')?.style.setProperty('color', periodoDias === 60 ? '#2563eb' : 'var(--text)');
+
+  if (MDT_CACHE[periodoDias]) { renderMdt(); return; }
+  MDT_CARREGANDO = true;
+  renderMdt();
+  const hoje = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const de = new Date(hoje); de.setDate(de.getDate() - periodoDias - 1);
+  const rows = await _carregarPeriodoMdt(_mdtFmtData(de), _mdtFmtData(hoje));
+  MDT_CACHE[periodoDias] = _mdtProcessar(rows, periodoDias, hoje);
+  MDT_CARREGANDO = false;
+  renderMdt();
+}
+
+function renderMdt() {
+  const el = document.getElementById('mdt-corpo');
+  if (!el) return;
+
+  if (MDT_CARREGANDO) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Carregando e calculando...</div>';
+    return;
+  }
+  const res = MDT_CACHE[MDT_PERIODO_ATUAL];
+  if (!res || !res.ranking.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">Sem anúncios com D0–D3 completo nesse período (lembrando: anúncios lançados nos últimos 3 dias ainda não entram na conta).</div>';
+    return;
+  }
+
+  const r2 = n => n == null ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const medalha = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + 'º';
+  const classeLinha = (i, total) => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : (i >= total - 2 ? 'bad' : '');
+  const corFundo = { gold: '#fff8e1', silver: '#f5f5f5', bronze: '#fdf1e6', bad: '#fdecea' };
+
+  const leituraDia = (p, i, total) => {
+    if (i === 0) return `Melhor CPC do grupo (${p.anuncios} anúncio(s) avaliados). Prioridade nº1 pra lançar criativo novo.`;
+    if (i <= 2) return `Entre os 3 melhores dias — ${p.anuncios} anúncio(s) na amostra.`;
+    if (i >= total - 2) return `Pior desempenho — evitar concentrar lançamentos aqui.`;
+    return `Desempenho mediano — ${p.anuncios} anúncio(s) na amostra.`;
+  };
+
+  // Ranking de dias
+  const linhasRanking = res.ranking.map((p, i) => {
+    const cls = classeLinha(i, res.ranking.length);
+    return `<tr style="background:${corFundo[cls] || 'transparent'};">
+      <td style="font-weight:700;">${medalha(i)}</td>
+      <td><b>${esc(p.dia)}</b></td>
+      <td>${p.anuncios}</td>
+      <td>R$ ${r2(p.cpc)}</td>
+      <td>${p.cpm != null ? 'R$ ' + r2(p.cpm) : '—'}</td>
+      <td>${p.ctr != null ? r2(p.ctr) + '%' : '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${esc(leituraDia(p, i, res.ranking.length))}</td>
+    </tr>`;
+  }).join('');
+
+  const melhores = res.ranking.slice(0, 3).map(p => p.dia).join(', ');
+  const pioresN = Math.min(2, res.ranking.length);
+  const piores = res.ranking.slice(-pioresN).map(p => p.dia).join(' e ');
+
+  // BM
+  const linhasBM = res.rankingBM.map((p, i) => `<tr>
+      <td><b>${esc(p.bm)}</b></td>
+      <td>R$ ${r2(p.cpc)}</td>
+      <td>${p.ctr != null ? r2(p.ctr) + '%' : '—'}</td>
+      <td>${p.anuncios}</td>
+    </tr>`).join('');
+
+  // Consistência
+  const corConsist = { ok: '#0ca30c', warn: '#d9a441', bad: '#e34948', muted: 'var(--muted)' };
+  const iconeConsist = { ok: '✅', warn: '⚠️', bad: '🔴', muted: '➖' };
+  const linhasConsist = res.consistencia.map(c => `<tr>
+      <td><b>${esc(c.dia)}</b></td>
+      ${c.porBm.map(x => `<td>${esc(x.bm)}: R$ ${r2(x.cpc)}</td>`).join('') || '<td colspan="1" style="color:var(--muted);">—</td>'}
+      <td style="color:${corConsist[c.cor]};">${iconeConsist[c.cor]} ${esc(c.leitura)}</td>
+    </tr>`).join('');
+
+  // Anúncios pra reinvestir
+  const linhaAnuncio = a => `<tr>
+      <td>${esc(a.campanha)}</td>
+      <td>${esc(a.bm)}</td>
+      <td>R$ ${r2(a.gTot)}</td>
+      <td>R$ ${r2(a.cpcTotal)}</td>
+      <td>${a.ctrTotal != null ? r2(a.ctrTotal) + '%' : '—'}</td>
+      <td>${a.diasAtivos}</td>
+    </tr>`;
+  const linhasProvados = res.provados.map(linhaAnuncio).join('') || '<tr><td colspan="6" style="color:var(--muted);">Nenhum anúncio se encaixa nesse critério ainda nesse período.</td></tr>';
+  const linhasPromissores = res.promissores.map(linhaAnuncio).join('') || '<tr><td colspan="6" style="color:var(--muted);">Nenhum anúncio se encaixa nesse critério ainda nesse período.</td></tr>';
+
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin:12px 0;">
+      Baseado em <b>${res.totalAnuncios} anúncios</b> lançados nos últimos ${res.periodoDias} dias (excluindo os últimos 3 dias — ainda sem D0–D3 completo). Métrica: CPC e CPM médios em D0–D3. Não inclui venda/ROAS da Shopee. Atualizado agora.
+    </div>
+
+    <div class="section">
+      <div class="section-title">Ranking de dias (do melhor pro pior)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        <thead><tr style="text-align:left;background:var(--bg2);">
+          <th style="padding:8px;">#</th><th style="padding:8px;">Dia</th><th style="padding:8px;">Anúncios</th>
+          <th style="padding:8px;">CPC médio D0–D3</th><th style="padding:8px;">CPM médio</th><th style="padding:8px;">CTR médio</th><th style="padding:8px;">Leitura</th>
+        </tr></thead>
+        <tbody>${linhasRanking}</tbody>
+      </table>
+    </div>
+
+    <div style="position:relative;height:260px;margin:20px 0;">
+      <canvas id="mdt-chart"></canvas>
+    </div>
+
+    <div style="background:#f7f9fc;border-left:4px solid #4a76a8;padding:14px 18px;margin:16px 0;border-radius:4px;">
+      <b>Recomendação:</b>
+      <ul style="margin:8px 0 0;padding-left:20px;">
+        <li>Priorizar lançamentos de criativo novo às: <b>${esc(melhores)}</b>.</li>
+        <li>Evitar concentrar lançamentos: <b>${esc(piores)}</b>.</li>
+      </ul>
+    </div>
+
+    <div class="section" style="margin-top:24px;">
+      <div class="section-title">Comparação por BM</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        <thead><tr style="text-align:left;background:var(--bg2);">
+          <th style="padding:8px;">BM</th><th style="padding:8px;">CPC médio</th><th style="padding:8px;">CTR médio</th><th style="padding:8px;">Anúncios (amostra)</th>
+        </tr></thead>
+        <tbody>${linhasBM}</tbody>
+      </table>
+    </div>
+
+    <div class="section" style="margin-top:24px;">
+      <div class="section-title">Consistência do dia entre BMs</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+        <thead><tr style="text-align:left;background:var(--bg2);"><th style="padding:8px;">Dia</th><th style="padding:8px;" colspan="2">CPC por BM</th><th style="padding:8px;">Leitura</th></tr></thead>
+        <tbody>${linhasConsist}</tbody>
+      </table>
+    </div>
+
+    <div style="background:#fff8e6;border-left:4px solid #d9a441;padding:14px 18px;margin:20px 0;border-radius:4px;font-size:13px;">
+      <b>Limitações importantes:</b>
+      <ul style="margin:8px 0 0;padding-left:20px;">
+        <li>Só dados do Meta — não cruza com venda/comissão da Shopee. Mostra tráfego mais barato, não ROAS.</li>
+        <li>Não é experimento controlado — o dia da semana está confundido com qual produto/criativo foi lançado naquele dia.</li>
+        <li>Dias com poucos anúncios na amostra são o achado mais frágil estatisticamente — vale confirmar ao longo do tempo.</li>
+      </ul>
+    </div>
+
+    <hr style="margin:32px 0;border:none;border-top:2px solid var(--border);">
+
+    <div class="section">
+      <div class="section-title">Quais anúncios reinvestir — últimos ${res.periodoDias} dias</div>
+      <div style="background:#fff8e6;border-left:4px solid #d9a441;padding:12px 16px;margin:12px 0;border-radius:4px;font-size:12px;">
+        Só dados de entrega do Meta — não sabe se virou venda. Confirme com o ROAS por Sub_ID na Análise MGD antes de comprometer orçamento maior.
+      </div>
+      <p style="font-size:13px;font-weight:600;margin-top:16px;">1) Já provados em escala — reinvestir com mais confiança</p>
+      <p style="font-size:12px;color:var(--muted);">Top 25% em investimento, CPC abaixo da mediana geral (R$ ${r2(res.cpcMediana)}), sustentando isso por 10+ dias.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
+        <thead><tr style="text-align:left;background:var(--bg2);"><th style="padding:8px;">Anúncio</th><th style="padding:8px;">BM</th><th style="padding:8px;">Investido</th><th style="padding:8px;">CPC</th><th style="padding:8px;">CTR</th><th style="padding:8px;">Dias ativo</th></tr></thead>
+        <tbody>${linhasProvados}</tbody>
+      </table>
+
+      <p style="font-size:13px;font-weight:600;margin-top:20px;">2) Eficientes mas ainda pouco testados — escalar com cautela</p>
+      <p style="font-size:12px;color:var(--muted);">CPC abaixo da mediana, investimento ainda baixo — vale subir orçamento aos poucos e observar se sustenta.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
+        <thead><tr style="text-align:left;background:var(--bg2);"><th style="padding:8px;">Anúncio</th><th style="padding:8px;">BM</th><th style="padding:8px;">Investido</th><th style="padding:8px;">CPC</th><th style="padding:8px;">CTR</th><th style="padding:8px;">Dias ativo</th></tr></thead>
+        <tbody>${linhasPromissores}</tbody>
+      </table>
+    </div>
+  `;
+
+  // Gráfico
+  if (window._mdtChartInstance) { window._mdtChartInstance.destroy(); }
+  const ctxEl = document.getElementById('mdt-chart');
+  if (ctxEl && window.Chart) {
+    window._mdtChartInstance = new Chart(ctxEl, {
+      type: 'bar',
+      data: {
+        labels: res.ranking.map(p => p.dia.replace('-feira', '')),
+        datasets: [
+          { label: 'CPC médio D0–D3 (R$)', data: res.ranking.map(p => p.cpc), backgroundColor: '#2a78d6', yAxisID: 'y' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'CPC (R$)' } } }
+      }
+    });
   }
 }
 let _reqPeriodoToken = 0; // evita race condition: resposta antiga sobrescrever período mais recente
@@ -7378,7 +7765,8 @@ const _navAbasPadrao = () => ([
   { id:'vendas-cookie', label:'Direta x Cookie', icon:'🍪', desc:'Separa vendas diretas de vendas por cookie, com ranking de produtos e campanhas.', visible:true, ordem:4 },
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:5 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:6 },
-  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:7 },
+  { id:'melhor-dia', label:'Melhor Dia Tráfego', icon:'📈', desc:'Mostra em qual dia da semana seus anúncios entregam mais barato, comparando BMs.', visible:true, ordem:7 },
+  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:8 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -7698,6 +8086,12 @@ function renderContasMeta() {
           <label>meta_token</label>
           <input type="password" value="${esc(c.token)}" placeholder="EAAxxxxxxxxxxxxxxx"
             oninput="updateContaMeta('${c.id}','token',this.value)">
+        </div>
+        <div class="cfg-field">
+          <label>BM (opcional)</label>
+          <input type="text" value="${esc(c.bm||'')}" placeholder="ex: BM01"
+            oninput="updateContaMeta('${c.id}','bm',this.value)">
+          <div class="cfg-hint-small">Usado pra agrupar contas na aba "Melhor Dia Tráfego". Em branco = agrupa por conta.</div>
         </div>
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
@@ -15389,6 +15783,7 @@ function showPage(id, btn) {
     return;
   }
   if (id==='criativo')    renderCriativo();
+  if (id==='melhor-dia')  _mdtCarregarEProcessar(MDT_PERIODO_ATUAL || 30);
   if ((id === 'meta-gmv' || id === 'mensal') && _bootDadosPromise && !_bootDadosFinalizado) {
     const pgId = id === 'meta-gmv' ? 'page-meta-gmv' : 'page-mensal';
     const pg = document.getElementById(pgId);

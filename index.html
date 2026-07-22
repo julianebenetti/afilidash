@@ -569,8 +569,8 @@ function garimpoRenderTop(){
   document.getElementById('garimpo-top-date').textContent = `rodada de ${garimpoFmtDate(latest)}`;
   const rodada = garimpoTop.filter(t=>t.data_indicacao===latest);
 
-  const cotas = { evergreen: 5, sazonal_data: 3, sazonal_estacao: 2 };
-  const rotulo = { evergreen: '🌱 Evergreen', sazonal_data: '🎯 Sazonal · Data', sazonal_estacao: '☀️ Sazonal · Estação' };
+  const cotas = { evergreen: 5, big_sazonal: 3, microsazonal: 2 };
+  const rotulo = { evergreen: '🌱 Evergreen', big_sazonal: '🌊 Big Sazonal', microsazonal: '🎯 Microsazonal' };
   let html = '';
   Object.keys(cotas).forEach(tipo=>{
     const itens = rodada.filter(t=>(t.tipo||'evergreen')===tipo)
@@ -600,8 +600,8 @@ function garimpoRenderFilters(){
   const tipos = [
     { v:'Todos', l:'Todos os tipos' },
     { v:'evergreen', l:'🌱 Evergreen' },
-    { v:'sazonal_data', l:'🎯 Sazonal · Data' },
-    { v:'sazonal_estacao', l:'☀️ Sazonal · Estação' },
+    { v:'big_sazonal', l:'🌊 Big Sazonal' },
+    { v:'microsazonal', l:'🎯 Microsazonal' },
   ];
   document.getElementById('garimpo-filters-tipo').innerHTML = tipos.map(t=>
     `<button class="filter-btn ${t.v===garimpoActiveTipo?'on':''}" onclick="garimpoActiveTipo='${t.v}';garimpoRenderFilters();garimpoRenderTable();">${t.l}</button>`
@@ -614,7 +614,7 @@ function garimpoRenderFilters(){
 function garimpoMontarPool20(){
   const tested = garimpoTestedMap();
   const disponiveis = garimpoProdutos.filter(p=>!tested[p.produto]);
-  const cotas = { evergreen: 10, sazonal_data: 6, sazonal_estacao: 4 };
+  const cotas = { evergreen: 10, big_sazonal: 6, microsazonal: 4 };
   let pool = [];
   Object.keys(cotas).forEach(tipo=>{
     const grupo = disponiveis.filter(p=>(p.tipo||'evergreen')===tipo)
@@ -625,10 +625,10 @@ function garimpoMontarPool20(){
   return pool;
 }
 
-const GARIMPO_TIPO_ROTULO = { evergreen:'🌱 Evergreen', sazonal_data:'🎯 Sazonal·Data', sazonal_estacao:'☀️ Sazonal·Estação' };
+const GARIMPO_TIPO_ROTULO = { evergreen:'🌱 Evergreen', big_sazonal:'🌊 Big Sazonal', microsazonal:'🎯 Microsazonal' };
 
 function garimpoRenderTable(){
-  let list = garimpoMontarPool20(); // pool fixo: 10 evergreen + 6 sazonal-data + 4 sazonal-estação
+  let list = garimpoMontarPool20(); // pool fixo: 10 evergreen + 6 big-sazonal + 4 microsazonal (50/30/20)
   const poolTotal = list.length;
 
   if(garimpoActiveTipo!=="Todos") list = list.filter(p=>(p.tipo||'evergreen')===garimpoActiveTipo);
@@ -648,7 +648,7 @@ function garimpoRenderTable(){
     list = [...list].sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0));
   }
 
-  document.getElementById('garimpo-count-label').textContent = `mostrando ${list.length} de ${poolTotal} (cota: 10 evergreen + 6 sazonal-data + 4 sazonal-estação)`;
+  document.getElementById('garimpo-count-label').textContent = `mostrando ${list.length} de ${poolTotal} (cota: 10 evergreen + 6 big-sazonal + 4 microsazonal)`;
 
   document.getElementById('garimpo-tbody').innerHTML = list.map(p=>`
     <tr class="data-row">
@@ -728,54 +728,29 @@ document.getElementById('garimpo-filter-text')?.addEventListener('input', e=>{ g
     <div id="garimpo-modal-body"></div>
     <div id="garimpo-modal-veredito" style="display:none;margin-top:14px;padding:14px;border-radius:10px;border:1px solid var(--green-bdr);background:var(--green-bg);text-align:center;">
       <div style="font-weight:700;color:var(--green);">✅ Produto Aprovado!</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Todos os critérios foram avaliados. Pronto pra ir ao ar!</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Mais pontos positivos que negativos — critério da Turma 3. Pronto pra ir ao ar!</div>
     </div>
   </div>
 </div>
 <script>
 // ── Checklist de avaliação de produto (baseado nas aulas MGD) — namespace garimpoChk ──
 const GARIMPO_CHK_DATA = [
-  { id:'s1', step:'01', title:'Potencial de Venda', sub:'O produto tem demanda real?', items:[
-    { text:'Resolve um problema que acontece TODO DIA?', note:'Quanto mais frequente a dor, maior a venda.', critical:true },
-    { text:'Resolve o problema de muita gente?', note:'Quanto maior o público, maior o potencial.' },
-    { text:'Tem potencial de viralização / quebra de padrão?', note:'Visual que prende, apresentado de forma diferente do normal.' },
-    { text:'O preço é tão atrativo que seria "burrice não comprar"?', note:'Ex: kit de esponja por R$10, conjunto de treino baratíssimo.' },
-    { text:'É desejável o suficiente para justificar o valor?', note:'Ex: fechadura inteligente — o preço precisa ser justificado pelo desejo.' },
-    { text:'Está dentro de um nicho de alto potencial?', note:'Moda Feminina, Saúde/Beleza, Pet, Kids, Casa/Decoração (público majoritariamente mulheres 25-65+). Eletrônicos entra na lista, mas com ressalva do curso: alta busca, porém muita concorrência.' },
-  ]},
-  { id:'s2', step:'02', title:'Sazonalidade e Tendência', sub:'Esse produto vende AGORA?', items:[
-    { text:'Está alinhado com a sazonalidade atual?', note:'Verão → moda praia, protetor solar. Inverno → cobertores, aquecedores.', critical:true },
-    { text:'Está em tendência ou tem potencial viral?', note:'Produtos em alta convertem mais facilmente.' },
-    { text:'Classifiquei como Evergreen ou Sazonal?', note:'Meta: 50% evergreen (rodam meses) + 30% sazonal por data + 20% sazonal por estação.', auto:'tipo' },
-  ]},
-  { id:'s3', step:'03', title:'Comissão e Rentabilidade', sub:'Vale o investimento em anúncio?', items:[
-    { text:'Comissão acima de 10% ou valor absoluto que justifique o gasto?', note:'Comissão mínima garante sua margem de lucro.', critical:true, auto:'comissao' },
-    { text:'Escolhi o fornecedor com melhor relação comissão × avaliações?', note:'Não é só a maior comissão — a loja precisa ter boa reputação.' },
-  ]},
-  { id:'s4', step:'04', title:'Avaliações e Prova Social', sub:'O produto tem credibilidade?', items:[
-    { text:'Nota acima de 4 estrelas (ideal 4.5+)?', note:'Avaliações positivas = prova social indispensável para os criativos.', critical:true, auto:'nota' },
-    { text:'Há comentários detalhados de clientes?', note:'Comentários detalhados passam mais confiança e ajudam nos criativos.' },
-    { text:'Existem fotos/vídeos reais de clientes usando o produto?', note:'Conteúdo real de compradores aumenta muito a conversão.' },
-    { text:'A loja tem credibilidade? (Loja Oficial ou Loja Indicada?)', note:'Loja oficial = mais segurança para o comprador.' },
-    { text:'A quantidade de vendas do produto é expressiva?', note:'Muitas vendas = produto validado pelo mercado.', auto:'vendas' },
-  ]},
-  { id:'s5', step:'05', title:'Logística e Estoque', sub:'O produto está pronto para escalar?', items:[
-    { text:'Estoque suficiente para não esgotar com os anúncios?', note:'Produto esgotado = verba de anúncio jogada fora.', critical:true },
-    { text:'Tem frete grátis disponível?', note:'Frete grátis é um gatilho poderoso que aumenta a conversão.' },
-    { text:'Há cupons de loja ou promoção ativa?', note:'Descontos e cupons aumentam drasticamente a conversão.' },
-    { text:'A loja tem diversidade de produtos?', note:'Loja com variedade indica estrutura e credibilidade.' },
-  ]},
-  { id:'s6', step:'06', title:'Preço e Competitividade', sub:'O preço está competitivo?', items:[
-    { text:'O preço é competitivo comparado a outros sellers da mesma categoria?', note:'Preço competitivo afeta diretamente a conversão.', critical:true },
-    { text:'A diferença de preço em relação a lojas físicas é visível?', note:'Mostrar essa diferença no criativo é um gatilho poderoso.' },
-    { text:'Já negociei com o vendedor via chat? (amostras, materiais exclusivos)', note:'Peça amostra para gravar criativos ou materiais exclusivos da loja.' },
-  ]},
-  { id:'s7', step:'07', title:'Rastreamento e Configuração', sub:'Está tudo pronto para rodar?', items:[
-    { text:'Renomeei o link com o mesmo nome da campanha no Meta?', note:'Ex: campanha "blusa01x07dez" → SUBID também "blusa01x07dez".', critical:true },
-    { text:'Tenho o ID do produto para colocar na tela (se for TOP 3/TOP 5)?', note:'IDs visíveis facilitam a automação de envio de links.' },
-    { text:'A automação para envio do link está configurada?', note:'SEMPRE ter automação enviando o link para quem comentar/interagir.' },
-  ], alerta:'⚠️ Atenção ao SUBID: se a campanha se chama "blusa01x07dez", o SUBID também deve ser "blusa01x07dez". Isso garante que você rastreie exatamente qual criativo gerou a venda.' },
+  { id:'s1', step:'', title:'Checklist de Escolha (Turma 3 · Aula 2)', sub:'Critério-mestre: preço × comissão × chance de venda — nunca um eixo só.', items:[
+    { text:'Nota 4,7 ou mais', note:'Piso, não mais "ideal". Abaixo disso, não sobe.', critical:true, auto:'nota' },
+    { text:'Estoque suficiente (infinito para produto viral)', note:'Confira digitando "2" no seletor de quantidade (ou variação + carrinho).', critical:true },
+    { text:'Prova de venda — foge de produto com 1-2 vendas só', note:'Referência: viral com 100-200 vendidos já é pouco. Venda moderada de 100-400 já roda.', auto:'vendas' },
+    { text:'ÚLTIMAS avaliações boas, com foto', note:'Olha as últimas, não só a média geral. 4,9 com últimas ruins = não sobe.' },
+    { text:'Preço de impulso (até ~R$200)', note:'Régua de hoje: produto de impulso até ~R$200.', critical:true, auto:'preco' },
+    { text:'Cupom / frete grátis / leve-mais', note:'Qualquer um desses três já é sinal positivo forte.' },
+    { text:'Comissão saudável (20-30%+)', note:'Recusa comissão abaixo de 3%. Lembre: R$15 a 20% dá R$3, R$80 a 10% dá R$8 — olha o valor E a chance de venda, não só o %.', critical:true, auto:'comissao' },
+    { text:'SubID igual à campanha', note:'Ex: campanha "blusa01x24fev" → SubID também "blusa01x24fev". Rastreamento correto desde o início.' },
+  ], alerta:'⚠️ Criativo de avaliação: nunca mostrar criança nem rosto de terceiro sem autorização. Regra dos 18-24: nunca rodar essa faixa etária pra nicho feminino geral.' },
 ];
+
+// Regra de decisão da Turma 3: mais pontos positivos que negativos → aprova
+// (não precisa mais ser 100% dos itens marcados)
+const GARIMPO_CHK_TOTAL_ITENS = GARIMPO_CHK_DATA.reduce((a,s)=>a+s.items.length,0);
+const GARIMPO_CHK_MAIORIA = Math.floor(GARIMPO_CHK_TOTAL_ITENS/2) + 1;
 
 let garimpoChkProdutoAtual = null;
 let garimpoChkRespostas = {};
@@ -792,13 +767,20 @@ function garimpoAbrirChecklist(produtoNome) {
     if (!garimpoChkRespostas[sec.id]) garimpoChkRespostas[sec.id] = new Array(sec.items.length).fill(false);
     sec.items.forEach((item, i) => {
       if (garimpoChkRespostas[sec.id][i]) return; // não sobrescreve o que já foi marcado manualmente
+      // Critérios definitivos da Turma 3 (Aula 2): nota 4,7+ · comissão 20%+ (ou CPA
+      // cobre o piso de R$62,20 calculado a partir do seu gasto diário real) ·
+      // preço até ~R$200 · prova de venda a partir de 100 vendidos
       if (item.auto === 'comissao') {
         const pct = parseFloat(p.comissao_percentual) || 0;
         const val = parseFloat(p.cpa_maximo) || 0;
-        if (pct >= 10 || val >= 10) garimpoChkRespostas[sec.id][i] = true;
+        if (pct >= 20 || val >= 62.20) garimpoChkRespostas[sec.id][i] = true;
       }
-      if (item.auto === 'nota' && parseFloat(p.nota) >= 4) garimpoChkRespostas[sec.id][i] = true;
-      if (item.auto === 'vendas' && (p.vendas || 0) >= 1000) garimpoChkRespostas[sec.id][i] = true;
+      if (item.auto === 'nota' && parseFloat(p.nota) >= 4.7) garimpoChkRespostas[sec.id][i] = true;
+      if (item.auto === 'vendas' && (p.vendas || 0) >= 100) garimpoChkRespostas[sec.id][i] = true;
+      if (item.auto === 'preco') {
+        const precoNum = parseFloat(String(p.preco||'').replace(/[^\d,.-]/g,'').split(/[-–]/)[0].replace(',','.')) || 0;
+        if (precoNum > 0 && precoNum <= 200) garimpoChkRespostas[sec.id][i] = true;
+      }
       if (item.auto === 'tipo' && p.tipo) garimpoChkRespostas[sec.id][i] = true;
     });
   });
@@ -824,7 +806,7 @@ function garimpoRenderChecklist() {
   const pct = total ? Math.round((checked/total)*100) : 0;
   document.getElementById('garimpo-modal-bar').style.width = pct + '%';
   document.getElementById('garimpo-modal-pct').textContent = pct + '% (' + checked + '/' + total + ')';
-  document.getElementById('garimpo-modal-veredito').style.display = pct === 100 ? 'block' : 'none';
+  document.getElementById('garimpo-modal-veredito').style.display = checked >= GARIMPO_CHK_MAIORIA ? 'block' : 'none';
 
   document.getElementById('garimpo-modal-body').innerHTML = GARIMPO_CHK_DATA.map(sec => `
     <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -852,7 +834,7 @@ async function garimpoSalvarChecklist() {
   let total = 0, checked = 0;
   GARIMPO_CHK_DATA.forEach(sec => { total += sec.items.length; checked += (garimpoChkRespostas[sec.id]||[]).filter(Boolean).length; });
   const pct = total ? Math.round((checked/total)*100) : 0;
-  const body = { produto: garimpoChkProdutoAtual, respostas: garimpoChkRespostas, percentual: pct, aprovado: pct===100, atualizado_em: new Date().toISOString() };
+  const body = { produto: garimpoChkProdutoAtual, respostas: garimpoChkRespostas, percentual: pct, aprovado: checked>=GARIMPO_CHK_MAIORIA, atualizado_em: new Date().toISOString() };
   try {
     await fetch(`${GARIMPO_URL}/rest/v1/garimpo_checklist?on_conflict=produto`, {
       method:'POST',
@@ -8417,13 +8399,13 @@ let CFG_SHOPEE = carregar('cfg_shopee', []);
 let CFG_META = carregar('cfg_meta', []);
 const _navAbasPadrao = () => ([
   { id:'campanhas', label:'Campanhas', icon:'🚀', desc:'Gerencia campanhas, orçamento e plataforma vigente.', visible:true, ordem:1 },
-  { id:'analise-mgd', label:'Análise MGD', icon:'🎯', desc:'Veredito diário por campanha, do D0 ao D10+, com o motivo de cada decisão.', visible:true, ordem:2 },
+  { id:'analise-mgd', label:'Análise', icon:'🎯', desc:'Veredito diário por campanha, do D0 ao D10+, com o motivo de cada decisão.', visible:true, ordem:2 },
   { id:'pedidos', label:'Pedidos', icon:'📋', desc:'Mostra pedidos, status e comissões por plataforma.', visible:true, ordem:3 },
-  { id:'vendas-cookie', label:'Direta x Cookie', icon:'🍪', desc:'Separa vendas diretas de vendas por cookie, com ranking de produtos e campanhas.', visible:true, ordem:4 },
+  { id:'vendas-cookie', label:'Cookie', icon:'🍪', desc:'Separa vendas diretas de vendas por cookie, com ranking de produtos e campanhas.', visible:true, ordem:4 },
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:5 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:6 },
   { id:'garimpo', label:'Garimpo', icon:'🎯', desc:'Produtos minerados na Shopee pela rotina semanal, com CPA, Top 7 priorizados e acompanhamento de testes.', visible:true, ordem:7 },
-  { id:'melhor-dia', label:'Melhor Dia Tráfego', icon:'📈', desc:'Mostra em qual dia da semana seus anúncios entregam mais barato, comparando BMs.', visible:true, ordem:8 },
+  { id:'melhor-dia', label:'Janela Teste', icon:'📈', desc:'Mostra em qual dia da semana seus anúncios entregam mais barato, comparando BMs.', visible:true, ordem:8 },
   { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:9 },
 ]);
 function _navAbasNormalizar(raw) {

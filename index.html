@@ -33,6 +33,37 @@
   --mono:      'SF Mono', 'Fira Code', monospace;
   --r:         8px;
 }
+/* ── MODO ESCURO ── ativado via body.ad-dark, preferência salva no localStorage
+   (mesmo padrão do toggle de "ocultar nomes" que já existia) */
+body.ad-dark {
+  --bg:        #14161a;
+  --bg2:       #1b1e23;
+  --bg3:       #22262c;
+  --border:    #2c3138;
+  --text:      #e8e9eb;
+  --muted:     #9297a1;
+  --subtle:    #5c6169;
+  --green:     #4ade80;
+  --green-bg:  #11331f;
+  --green-bdr: #1f5c3a;
+  --red:       #f87171;
+  --red-bg:    #3a1518;
+  --red-bdr:   #5c2328;
+  --yellow:    #fbbf24;
+  --yellow-bg: #3a2e0f;
+  --blue:      #60a5fa;
+  --blue-bg:   #16233d;
+  --indigo:    #a5b4fc;
+  --teal:      #2dd4bf;
+  --purple:    #c4b5fd;
+}
+body.ad-dark table td, body.ad-dark table th { color:var(--text); }
+body.ad-dark .kpi-main { border-left-color:#60a5fa; }
+body.ad-dark ::-webkit-scrollbar { width:10px; height:10px; }
+body.ad-dark ::-webkit-scrollbar-track { background:var(--bg2); }
+body.ad-dark ::-webkit-scrollbar-thumb { background:var(--border); border-radius:6px; }
+body.ad-dark input, body.ad-dark select, body.ad-dark textarea { background:var(--bg2); color:var(--text); border-color:var(--border); }
+body.ad-dark .modal { background:var(--bg2); color:var(--text); }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; min-height:100vh; }
 
@@ -386,7 +417,250 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
   </div>
   <button id="btn-blur-nomes" onclick="toggleBlurNomes()" title="Borrar/mostrar nome das campanhas (Dashboard e Campanhas)"
     style="margin-left:8px;font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--muted);cursor:pointer;">🙈 Ocultar nomes</button>
+  <button id="btn-dark-mode" onclick="toggleDarkMode()" title="Alternar modo claro/escuro"
+    style="margin-left:8px;font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);color:var(--muted);cursor:pointer;">🌙 Modo escuro</button>
 </nav>
+
+<!-- ══════════════════════════════════════════
+     PÁGINA: GARIMPO SHOPEE (adicionada — conecta direto no Supabase
+     do garimpo, projeto separado do resto do AfiliDash)
+══════════════════════════════════════════ -->
+<div class="page" id="page-garimpo">
+
+  <div class="kpi-grid" id="garimpo-stats">
+    <div class="kpi"><div class="kpi-label">Carregando</div><div class="kpi-val">—</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">🎯 Top 7 priorizados</span>
+      <span class="section-sub" id="garimpo-top-date"></span>
+    </div>
+    <div id="garimpo-top-grid" style="padding:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">Todos os produtos</span>
+      <span class="section-sub" id="garimpo-count-label"></span>
+      <div class="controls" id="garimpo-filters" style="margin-left:auto;"></div>
+    </div>
+    <div style="padding:10px 16px; display:flex; gap:8px;">
+      <select class="op-sel" id="garimpo-filter-field">
+        <option value="produto">Produto</option>
+        <option value="loja">Loja</option>
+        <option value="preco">Preço</option>
+        <option value="comissao_percentual">Comissão %</option>
+        <option value="cpa_maximo">CPA máximo</option>
+        <option value="vendas">Vendas</option>
+        <option value="nota">Avaliação</option>
+        <option value="data_indicacao">Data da sugestão</option>
+      </select>
+      <input class="search-box" id="garimpo-filter-text" placeholder="Digite pra filtrar…" style="width:220px;">
+      <button class="act-btn" onclick="document.getElementById('garimpo-filter-text').value='';garimpoFreeText='';garimpoRenderTable();">✕ Limpar</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;" data-key="produto" onclick="garimpoSort('produto')">Produto</th>
+            <th data-key="nicho" onclick="garimpoSort('nicho')">Nicho</th>
+            <th data-key="preco" onclick="garimpoSort('preco')">Preço</th>
+            <th data-key="comissao_percentual" onclick="garimpoSort('comissao_percentual')">Com. %</th>
+            <th data-key="cpa_maximo" onclick="garimpoSort('cpa_maximo')">CPA máx.</th>
+            <th data-key="vendas" onclick="garimpoSort('vendas')">Vendas</th>
+            <th data-key="nota" onclick="garimpoSort('nota')">Nota</th>
+            <th data-key="data_indicacao" onclick="garimpoSort('data_indicacao')">Sugerido em</th>
+            <th>Link</th>
+            <th>Início do teste</th>
+          </tr>
+        </thead>
+        <tbody id="garimpo-tbody"><tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted);">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-title">✓ Testado</span>
+      <span class="section-sub" id="garimpo-tested-count"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;">Produto</th><th>Nicho</th><th>Início</th><th>Status</th>
+            <th>Verba (R$)</th><th>CPA real (R$)</th><th>Vendas geradas</th>
+          </tr>
+        </thead>
+        <tbody id="garimpo-tbody-tested"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── Namespace isolado "garimpo*" — não colide com nenhuma função existente do AfiliDash ──
+const GARIMPO_URL = "https://tkxkrbdvcctoajuigvvv.supabase.co";
+const GARIMPO_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRreGtyYmR2Y2N0b2FqdWlndnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NzY2NzUsImV4cCI6MjA5OTQ1MjY3NX0.-szTE2wYYr9DNTLiff6zmLpbP6UOL1l9SFpvc-29Njs";
+let garimpoProdutos = [], garimpoTop = [], garimpoCronograma = [];
+let garimpoActiveFilter = "Todos", garimpoSortKey = null, garimpoSortDir = 1;
+let garimpoFreeField = "produto", garimpoFreeText = "";
+
+function garimpoFmtNum(n){ return new Intl.NumberFormat('pt-BR').format(n||0); }
+function garimpoFmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+async function garimpoFetch(path){
+  const res = await fetch(`${GARIMPO_URL}/rest/v1/${path}`, { headers:{ apikey:GARIMPO_KEY, Authorization:`Bearer ${GARIMPO_KEY}` } });
+  if(!res.ok) throw new Error(`Erro ${res.status}`);
+  return res.json();
+}
+async function garimpoPatch(table, produto, body){
+  const res = await fetch(`${GARIMPO_URL}/rest/v1/${table}?produto=eq.${encodeURIComponent(produto)}`, {
+    method:'PATCH',
+    headers:{ apikey:GARIMPO_KEY, Authorization:`Bearer ${GARIMPO_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error(`Erro ${res.status} ao salvar`);
+}
+
+async function garimpoLoadAll(){
+  try{
+    const [produtos, top, cronograma] = await Promise.all([
+      garimpoFetch('garimpo_produtos?select=*&order=cpa_maximo.desc'),
+      garimpoFetch('garimpo_top3?select=*&order=data_indicacao.desc,cpa_maximo.desc'),
+      garimpoFetch('garimpo_cronograma?select=*')
+    ]);
+    garimpoProdutos = produtos; garimpoTop = top; garimpoCronograma = cronograma;
+    garimpoRenderStats(); garimpoRenderTop(); garimpoRenderFilters(); garimpoRenderTable(); garimpoRenderTested();
+  }catch(err){
+    document.getElementById('garimpo-tbody').innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--red);">Erro ao carregar: ${err.message}</td></tr>`;
+  }
+}
+
+function garimpoTestedMap(){
+  const m = {}; garimpoCronograma.forEach(c=>{ if(c.data_inicio) m[c.produto]=c; }); return m;
+}
+
+function garimpoRenderStats(){
+  const tested = garimpoTestedMap();
+  const totalVendas = garimpoProdutos.reduce((a,p)=>a+(p.vendas||0),0);
+  const melhorCPA = garimpoProdutos.length ? Math.max(...garimpoProdutos.map(p=>parseFloat(p.cpa_maximo)||0)) : 0;
+  document.getElementById('garimpo-stats').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total minerados</div><div class="kpi-val">${garimpoProdutos.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Vendas somadas</div><div class="kpi-val">${garimpoFmtNum(totalVendas)}</div></div>
+    <div class="kpi"><div class="kpi-label">Maior CPA</div><div class="kpi-val pos">R$${melhorCPA.toFixed(2)}</div></div>
+    <div class="kpi"><div class="kpi-label">Já em teste</div><div class="kpi-val pos">${Object.keys(tested).length}</div></div>
+  `;
+}
+
+function garimpoRenderTop(){
+  if(!garimpoTop.length){ document.getElementById('garimpo-top-grid').innerHTML = '<p style="color:var(--muted);font-size:12px;">Nenhum produto priorizado ainda.</p>'; return; }
+  const latest = garimpoTop.reduce((max,t)=> t.data_indicacao>max ? t.data_indicacao : max, garimpoTop[0].data_indicacao);
+  document.getElementById('garimpo-top-date').textContent = `rodada de ${garimpoFmtDate(latest)}`;
+  const top7 = garimpoTop.filter(t=>t.data_indicacao===latest).sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0)).slice(0,7);
+  document.getElementById('garimpo-top-grid').innerHTML = top7.map((t,i)=>`
+    <div style="border:1px solid var(--border);border-radius:var(--r);padding:12px;background:var(--bg);">
+      <span class="badge b-camp">#${i+1}</span>
+      <div style="font-weight:700;font-size:13px;margin:8px 0 4px;">${t.produto}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">${t.justificativa||''}</div>
+      <div style="display:flex;gap:14px;font-family:var(--mono);font-size:12px;">
+        <span>CPA <b style="color:#2563eb;">R$${parseFloat(t.cpa_maximo).toFixed(2)}</b></span>
+        <span>Vendas <b>${garimpoFmtNum(t.vendas)}</b></span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function garimpoRenderFilters(){
+  const tested = garimpoTestedMap();
+  const pool = garimpoProdutos.filter(p=>!tested[p.produto]);
+  const nichos = ["Todos", ...new Set(pool.map(p=>p.nicho).filter(Boolean))];
+  document.getElementById('garimpo-filters').innerHTML = nichos.map(n=>
+    `<button class="filter-btn ${n===garimpoActiveFilter?'on':''}" onclick="garimpoActiveFilter='${n.replace(/'/g,"\\'")}';garimpoRenderFilters();garimpoRenderTable();">${n}</button>`
+  ).join('');
+}
+
+function garimpoRenderTable(){
+  const tested = garimpoTestedMap();
+  let list = garimpoProdutos.filter(p=>!tested[p.produto]);
+  if(garimpoActiveFilter!=="Todos") list = list.filter(p=>p.nicho===garimpoActiveFilter);
+  const q = (document.getElementById('garimpo-filter-text')?.value || garimpoFreeText).trim().toLowerCase();
+  if(q){ list = list.filter(p=>{ const v=p[garimpoFreeField]; return v!=null && String(v).toLowerCase().includes(q); }); }
+
+  if(garimpoSortKey){
+    const numeric = ["comissao_percentual","cpa_maximo","vendas","nota"].includes(garimpoSortKey);
+    list = [...list].sort((a,b)=>{
+      let va=a[garimpoSortKey], vb=b[garimpoSortKey];
+      if(numeric){ va=parseFloat(va)||0; vb=parseFloat(vb)||0; return (va-vb)*garimpoSortDir; }
+      va=(va||'').toString().toLowerCase(); vb=(vb||'').toString().toLowerCase();
+      return va.localeCompare(vb)*garimpoSortDir;
+    });
+  } else {
+    list = [...list].sort((a,b)=>(parseFloat(b.cpa_maximo)||0)-(parseFloat(a.cpa_maximo)||0));
+  }
+
+  const totalPool = garimpoProdutos.filter(p=>!tested[p.produto]).length;
+  list = list.slice(0,15);
+  document.getElementById('garimpo-count-label').textContent = `mostrando ${list.length} de ${totalPool} não testados`;
+
+  document.getElementById('garimpo-tbody').innerHTML = list.map(p=>`
+    <tr class="data-row">
+      <td style="text-align:left;"><div style="font-weight:600;">${p.produto}</div><div style="color:var(--muted);font-size:11px;">${p.loja||''}</div></td>
+      <td>${p.nicho||'—'}</td>
+      <td>${p.preco||'—'}</td>
+      <td>${p.comissao_percentual||'—'}%</td>
+      <td style="color:#2563eb;font-weight:700;">R$${parseFloat(p.cpa_maximo||0).toFixed(2)}</td>
+      <td>${garimpoFmtNum(p.vendas)}</td>
+      <td>${p.nota||'—'}⭐</td>
+      <td style="font-family:var(--mono);font-size:11px;">${garimpoFmtDate(p.data_indicacao)}</td>
+      <td>${p.link ? `<a href="${p.link}" target="_blank" style="color:#2563eb;">abrir ↗</a>` : '<span style="color:var(--red);font-size:11px;">sem link</span>'}</td>
+      <td><input type="date" data-produto="${p.produto.replace(/"/g,'&quot;')}" class="garimpo-start-date date-input" onchange="garimpoSaveStart(this)"></td>
+    </tr>
+  `).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto com esse filtro.</td></tr>';
+}
+
+async function garimpoSaveStart(inp){
+  if(!inp.value) return;
+  try{
+    await garimpoPatch('garimpo_cronograma', inp.dataset.produto, { data_inicio: inp.value, status: 'Em teste' });
+    await garimpoLoadAll();
+  }catch(err){ alert('Não consegui salvar: ' + err.message); }
+}
+
+function garimpoSort(key){
+  if(garimpoSortKey===key){ garimpoSortDir *= -1; } else { garimpoSortKey = key; garimpoSortDir = 1; }
+  garimpoRenderTable();
+}
+
+function garimpoRenderTested(){
+  const rows = garimpoCronograma.filter(c=>c.data_inicio).sort((a,b)=>(b.data_inicio||'').localeCompare(a.data_inicio||''));
+  document.getElementById('garimpo-tested-count').textContent = `${rows.length} produto(s)`;
+  document.getElementById('garimpo-tbody-tested').innerHTML = rows.map(c=>`
+    <tr>
+      <td style="text-align:left;font-weight:600;">${c.produto}</td>
+      <td>${c.nicho||'—'}</td>
+      <td style="font-family:var(--mono);font-size:11px;">${garimpoFmtDate(c.data_inicio)}</td>
+      <td>
+        <select class="op-sel" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="status" onchange="garimpoSaveField(this)">
+          ${['A testar','Em teste','Pausado','Concluído'].map(s=>`<option value="${s}" ${c.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" step="0.01" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="verba_investida" value="${c.verba_investida??''}" onchange="garimpoSaveField(this)"></td>
+      <td><input type="number" step="0.01" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="cpa_real" value="${c.cpa_real??''}" onchange="garimpoSaveField(this)"></td>
+      <td><input type="number" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="vendas_gerados" value="${c.vendas_gerados??''}" onchange="garimpoSaveField(this)"></td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr>';
+}
+
+async function garimpoSaveField(el){
+  const val = el.value === '' ? null : (el.type==='number' ? parseFloat(el.value) : el.value);
+  try{ await garimpoPatch('garimpo_cronograma', el.dataset.produto, { [el.dataset.field]: val }); }
+  catch(err){ alert('Não consegui salvar: ' + err.message); }
+}
+
+document.getElementById('garimpo-filter-field')?.addEventListener('change', e=>{ garimpoFreeField = e.target.value; garimpoRenderTable(); });
+document.getElementById('garimpo-filter-text')?.addEventListener('input', e=>{ garimpoFreeText = e.target.value; garimpoRenderTable(); });
+</script>
 
 <!-- ══════════════════════════════════════════
      PÁGINA: DASHBOARD
@@ -5156,6 +5430,18 @@ function toggleBlurNomes(forcarEstado) {
 function _restaurarEstadoBlurNomes() {
   if (localStorage.getItem('ad_blur_nomes') === '1') toggleBlurNomes(true);
 }
+// Modo escuro — mesma lógica/persistência do toggle de ocultar nomes acima.
+function toggleDarkMode(forcarEstado) {
+  const btn = document.getElementById('btn-dark-mode');
+  if (!btn) return;
+  const ativo = forcarEstado !== undefined ? forcarEstado : !document.body.classList.contains('ad-dark');
+  document.body.classList.toggle('ad-dark', ativo);
+  btn.textContent = ativo ? '☀️ Modo claro' : '🌙 Modo escuro';
+  localStorage.setItem('ad_dark_mode', ativo ? '1' : '0');
+}
+function _restaurarEstadoDarkMode() {
+  if (localStorage.getItem('ad_dark_mode') === '1') toggleDarkMode(true);
+}
 // Redimensiona a tabela do Dashboard pra ocupar o espaço realmente disponível
 // na tela, em vez de uma altura fixa — assim, recolher os KPIs de fato mostra
 // mais linhas, não só sobra espaço em branco embaixo.
@@ -7924,8 +8210,9 @@ const _navAbasPadrao = () => ([
   { id:'vendas-cookie', label:'Direta x Cookie', icon:'🍪', desc:'Separa vendas diretas de vendas por cookie, com ranking de produtos e campanhas.', visible:true, ordem:4 },
   { id:'meta-gmv', label:'Meta GMV', icon:'💲', desc:'Acompanha metas, bônus e acumulado da GMV.', visible:true, ordem:5 },
   { id:'mensal', label:'Resumo Mensal', icon:'📅', desc:'Consolida resultado líquido por operação e período.', visible:true, ordem:6 },
-  { id:'melhor-dia', label:'Melhor Dia Tráfego', icon:'📈', desc:'Mostra em qual dia da semana seus anúncios entregam mais barato, comparando BMs.', visible:true, ordem:7 },
-  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:8 },
+  { id:'garimpo', label:'Garimpo', icon:'🎯', desc:'Produtos minerados na Shopee pela rotina semanal, com CPA, Top 7 priorizados e acompanhamento de testes.', visible:true, ordem:7 },
+  { id:'melhor-dia', label:'Melhor Dia Tráfego', icon:'📈', desc:'Mostra em qual dia da semana seus anúncios entregam mais barato, comparando BMs.', visible:true, ordem:8 },
+  { id:'whats', label:'Grupos', icon:'🟢', desc:'Monitora grupos WhatsApp e histórico de entradas/saídas.', visible:true, ordem:9 },
 ]);
 function _navAbasNormalizar(raw) {
   const base = _navAbasPadrao();
@@ -8053,6 +8340,8 @@ function renderNavAbas() {
         ? "showPage('analise-mgd',this);renderAnaliseMGD()"
         : a.id === 'vendas-cookie'
         ? "showPage('vendas-cookie',this);renderVendasCookieMensal();renderVendasCookie()"
+        : a.id === 'garimpo'
+        ? "showPage('garimpo',this);if(window.garimpoLoadAll)garimpoLoadAll();"
         : `showPage('${a.id}',this)`,
     })),
   ];
@@ -16528,6 +16817,7 @@ _carregarConfigServidor().then(carregouServidor => {
   _restaurarEstadoKpiGrid();
   _ajustarAlturaTabelaDash();
   _restaurarEstadoBlurNomes();
+  _restaurarEstadoDarkMode();
 });
 </script>
 </body>

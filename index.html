@@ -768,12 +768,12 @@ function garimpoAbrirChecklist(produtoNome) {
     sec.items.forEach((item, i) => {
       if (garimpoChkRespostas[sec.id][i]) return; // não sobrescreve o que já foi marcado manualmente
       // Critérios definitivos da Turma 3 (Aula 2): nota 4,7+ · comissão 20%+ (ou CPA
-      // cobre o piso de R$62,20 calculado a partir do seu gasto diário real) ·
+      // cobre o piso de R$37,32 calculado a partir do seu gasto diário real ·
       // preço até ~R$200 · prova de venda a partir de 100 vendidos
       if (item.auto === 'comissao') {
         const pct = parseFloat(p.comissao_percentual) || 0;
         const val = parseFloat(p.cpa_maximo) || 0;
-        if (pct >= 20 || val >= 62.20) garimpoChkRespostas[sec.id][i] = true;
+        if (pct >= 20 || val >= 37.32) garimpoChkRespostas[sec.id][i] = true;
       }
       if (item.auto === 'nota' && parseFloat(p.nota) >= 4.7) garimpoChkRespostas[sec.id][i] = true;
       if (item.auto === 'vendas' && (p.vendas || 0) >= 100) garimpoChkRespostas[sec.id][i] = true;

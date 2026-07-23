@@ -493,10 +493,10 @@ body.ad-blur-nomes .ad-nome-camp { filter: blur(6px); user-select: none; }
         <thead>
           <tr>
             <th style="text-align:left;">Produto</th><th>Nicho</th><th>Início</th><th>Status</th>
-            <th>Verba (R$)</th><th>CPA real (R$)</th><th>Vendas geradas</th>
+            <th>Verba (R$)</th><th>CPA real (R$)</th><th>Vendas geradas</th><th>Ações</th>
           </tr>
         </thead>
-        <tbody id="garimpo-tbody-tested"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr></tbody>
+        <tbody id="garimpo-tbody-tested"><tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -684,6 +684,15 @@ function garimpoSort(key){
   garimpoRenderTable();
 }
 
+function garimpoParseNumBR(str){
+  if(str==null || str==='') return null;
+  const n = parseFloat(String(str).replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? null : n;
+}
+function garimpoFmtNumBR(n){
+  return (n===null||n===undefined||n==='') ? '' : String(n).replace('.',',');
+}
+
 function garimpoRenderTested(){
   const rows = garimpoCronograma.filter(c=>c.data_inicio).sort((a,b)=>(b.data_inicio||'').localeCompare(a.data_inicio||''));
   document.getElementById('garimpo-tested-count').textContent = `${rows.length} produto(s)`;
@@ -691,23 +700,49 @@ function garimpoRenderTested(){
     <tr>
       <td style="text-align:left;font-weight:600;">${c.produto}</td>
       <td>${c.nicho||'—'}</td>
-      <td style="font-family:var(--mono);font-size:11px;">${garimpoFmtDate(c.data_inicio)}</td>
+      <td><input type="date" class="date-input" value="${c.data_inicio||''}" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="data_inicio" onchange="garimpoSaveField(this)" style="font-family:var(--mono);font-size:11px;"></td>
       <td>
         <select class="op-sel" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="status" onchange="garimpoSaveField(this)">
           ${['A testar','Em teste','Pausado','Concluído'].map(s=>`<option value="${s}" ${c.status===s?'selected':''}>${s}</option>`).join('')}
         </select>
       </td>
-      <td><input type="number" step="0.01" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="verba_investida" value="${c.verba_investida??''}" onchange="garimpoSaveField(this)"></td>
-      <td><input type="number" step="0.01" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="cpa_real" value="${c.cpa_real??''}" onchange="garimpoSaveField(this)"></td>
-      <td><input type="number" style="width:80px;" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="vendas_gerados" value="${c.vendas_gerados??''}" onchange="garimpoSaveField(this)"></td>
+      <td><input type="text" inputmode="decimal" style="width:80px;" placeholder="0,00" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="verba_investida" data-numeric="1" value="${garimpoFmtNumBR(c.verba_investida)}" onchange="garimpoSaveField(this)"></td>
+      <td><input type="text" inputmode="decimal" style="width:80px;" placeholder="0,00" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="cpa_real" data-numeric="1" value="${garimpoFmtNumBR(c.cpa_real)}" onchange="garimpoSaveField(this)"></td>
+      <td><input type="text" inputmode="numeric" style="width:70px;" placeholder="0" data-produto="${c.produto.replace(/"/g,'&quot;')}" data-field="vendas_gerados" data-numeric="1" value="${garimpoFmtNumBR(c.vendas_gerados)}" onchange="garimpoSaveField(this)"></td>
+      <td>
+        <button class="act-btn" style="font-size:11px;padding:4px 10px;" onclick="garimpoAbrirChecklist('${c.produto.replace(/'/g,"\\'")}')">📋 Avaliar</button>
+        <button class="act-btn" style="font-size:10.5px;padding:4px 8px;margin-top:3px;color:var(--red);" title="Remove a data de início e volta o produto pra lista principal" onclick="garimpoRemoverDoTeste('${c.produto.replace(/'/g,"\\'")}')">↩ Remover do teste</button>
+      </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr>';
+  `).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto testado ainda.</td></tr>';
 }
 
 async function garimpoSaveField(el){
-  const val = el.value === '' ? null : (el.type==='number' ? parseFloat(el.value) : el.value);
-  try{ await garimpoPatch('garimpo_cronograma', el.dataset.produto, { [el.dataset.field]: val }); }
+  let val;
+  if(el.dataset.numeric){
+    val = garimpoParseNumBR(el.value);
+  } else {
+    val = el.value === '' ? null : el.value;
+  }
+  try{
+    await garimpoPatch('garimpo_cronograma', el.dataset.produto, { [el.dataset.field]: val });
+    if(el.dataset.field === 'data_inicio'){
+      if(!val){ await garimpoLoadAll(); } // voltou pra pool principal
+      else {
+        const c = garimpoCronograma.find(x=>x.produto===el.dataset.produto);
+        if(c) c.data_inicio = val;
+      }
+    }
+  }
   catch(err){ alert('Não consegui salvar: ' + err.message); }
+}
+
+async function garimpoRemoverDoTeste(produto){
+  if(!confirm(`Remover "${produto}" do teste? Ele volta pra lista principal e os dados de verba/CPA real/vendas geradas são apagados.`)) return;
+  try{
+    await garimpoPatch('garimpo_cronograma', produto, { data_inicio: null, status: 'A testar', verba_investida: null, cpa_real: null, vendas_gerados: null });
+    await garimpoLoadAll();
+  }catch(err){ alert('Não consegui remover: ' + err.message); }
 }
 
 document.getElementById('garimpo-filter-field')?.addEventListener('change', e=>{ garimpoFreeField = e.target.value; garimpoRenderTable(); });

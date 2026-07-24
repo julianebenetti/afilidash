@@ -1931,8 +1931,29 @@ function garimpoAtualizarBadgeAvaliacao(produto) {
         </div>
       </div>
 
-
       <div class="cfg-card">
+        <div class="cfg-card-title">Monitor Shopee (Google Sheets) <span style="font-size:11px;font-weight:400;color:#c9c6be;">— envia os links ativos automaticamente pra planilha</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+          Assim que o AfiliDash abre, ele pega as campanhas ativas com link cadastrado (aba Campanhas), ignora duplicadas do mesmo produto (só a versão mais recente) e manda pro Monitor Shopee automaticamente — sem precisar clicar em nada.
+        </div>
+        <div class="cfg-row2">
+          <div class="cfg-field" style="flex:1 1 100%;">
+            <label>URL do Web App (Apps Script)</label>
+            <input type="text" id="monitor-shopee-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="width:100%;">
+          </div>
+        </div>
+        <div class="chk" style="display:flex;align-items:center;gap:8px;margin:10px 0;">
+          <input type="checkbox" id="monitor-shopee-ativo" style="width:16px;height:16px;">
+          <label for="monitor-shopee-ativo" style="margin:0;font-weight:600;font-size:13px;">Sincronizar automaticamente ao abrir o AfiliDash</label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button class="act-btn" onclick="salvarConfigMonitorShopee()" style="border-color:var(--green);color:var(--green);">💾 Salvar</button>
+          <button class="act-btn" onclick="sincronizarMonitorShopee(true)" style="border-color:#2563eb;color:#2563eb;">🔄 Sincronizar agora</button>
+          <span id="monitor-shopee-status" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+      </div>
+
+      <div class="cfg-card" style="margin-top:4px;">
         <div class="cfg-card-title">Backup e Restauração</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Exporte um backup completo das configurações ou restaure a partir de um arquivo salvo anteriormente.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -6912,6 +6933,107 @@ async function exportarLinksAtivos() {
   }
 }
 
+// ═══════════════════════════════════════════
+// MONITOR SHOPEE — sincronização automática de links ativos
+// ═══════════════════════════════════════════
+
+// Remove prefixo de data (ex: "17jul26", "24Jul26") e sufixo de versão (ex: "vs1", "v2")
+// do sub_id, pra comparar se dois anúncios são o "mesmo produto".
+function _normalizarNomeProdutoDedupe(sid) {
+  let s = String(sid || '').toLowerCase().trim();
+  s = s.replace(/^\d{1,2}(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\d{2,4}/i, '');
+  s = s.replace(/vs?\d+$/i, '');
+  s = s.trim();
+  return s || String(sid || '').toLowerCase();
+}
+
+// Tenta extrair a data no início do sub_id, pra saber qual versão é mais recente
+// quando dois anúncios batem no mesmo produto (dedupe).
+function _extrairDataSid(sid) {
+  const meses = { jan:0, fev:1, mar:2, abr:3, mai:4, jun:5, jul:6, ago:7, set:8, out:9, nov:10, dez:11 };
+  const m = String(sid || '').match(/^(\d{1,2})(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)(\d{2,4})/i);
+  if (!m) return null;
+  let ano = parseInt(m[3], 10);
+  if (ano < 100) ano += 2000;
+  const d = new Date(ano, meses[m[2].toLowerCase()], parseInt(m[1], 10));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function salvarConfigMonitorShopee() {
+  const urlEl = document.getElementById('monitor-shopee-url');
+  const ativoEl = document.getElementById('monitor-shopee-ativo');
+  CFG_MONITOR_SHOPEE.url = (urlEl?.value || '').trim();
+  CFG_MONITOR_SHOPEE.ativo = !!(ativoEl?.checked);
+  salvar('cfg_monitor_shopee', CFG_MONITOR_SHOPEE);
+  toast('Configuração do Monitor Shopee salva.', 'ok');
+}
+
+// forcado=true → dispara mesmo com a sincronização automática desligada, e mostra toasts
+// (usado pelo botão "Sincronizar agora"). forcado=false → chamado automaticamente na
+// abertura do AfiliDash, só roda se estiver ativado e ainda não tiver rodado nesta sessão.
+async function sincronizarMonitorShopee(forcado) {
+  const statusEl = document.getElementById('monitor-shopee-status');
+  const setStatus = (msg, cor) => { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = cor || 'var(--muted)'; } };
+
+  if (!forcado) {
+    if (!CFG_MONITOR_SHOPEE.ativo) return;
+    if (_monitorShopeeSincronizadoNestaSessao) return;
+  }
+  if (!CFG_MONITOR_SHOPEE.url) {
+    if (forcado) { toast('Configure a URL do Web App primeiro.', 'warn'); setStatus('URL não configurada', 'var(--red)'); }
+    return;
+  }
+
+  const candidatos = Object.entries(CFG_CAMPANHAS)
+    .filter(([sid, c]) => c && (c.effective_status || '').toUpperCase() === 'ACTIVE' && c.link);
+
+  if (!candidatos.length) {
+    if (forcado) toast('Nenhuma campanha ativa com link encontrada.', 'warn');
+    _monitorShopeeSincronizadoNestaSessao = true;
+    return;
+  }
+
+  // Dedupe por produto (ignora sufixo vsN): mantém a versão mais recente pela data no
+  // início do sub_id; se não der pra comparar data, mantém o último encontrado na lista.
+  const porProduto = {};
+  candidatos.forEach(([sid, c]) => {
+    const chave = _normalizarNomeProdutoDedupe(sid);
+    const dataAtual = _extrairDataSid(sid);
+    const existente = porProduto[chave];
+    if (!existente) {
+      porProduto[chave] = { sid, link: c.link, data: dataAtual };
+    } else if (dataAtual && existente.data) {
+      if (dataAtual >= existente.data) porProduto[chave] = { sid, link: c.link, data: dataAtual };
+    } else {
+      porProduto[chave] = { sid, link: c.link, data: dataAtual || existente.data };
+    }
+  });
+
+  const links = Object.values(porProduto).map(p => ({ nome: p.sid, link: p.link }));
+
+  if (forcado) toast(`Sincronizando ${links.length} produto(s) único(s) com o Monitor Shopee...`, 'info');
+  setStatus('Enviando...', 'var(--muted)');
+
+  try {
+    // mode:'no-cors' porque o Apps Script Web App não devolve cabeçalhos CORS legíveis
+    // pelo navegador — o envio funciona (o Google recebe e processa normalmente), só não
+    // conseguimos ler a resposta de volta aqui. Por isso é "fire-and-forget".
+    await fetch(CFG_MONITOR_SHOPEE.url, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ links })
+    });
+    CFG_MONITOR_SHOPEE.ultimaSync = new Date().toISOString();
+    salvar('cfg_monitor_shopee', CFG_MONITOR_SHOPEE);
+    _monitorShopeeSincronizadoNestaSessao = true;
+    setStatus(`✓ Enviado ${links.length} produto(s) — ${new Date().toLocaleString('pt-BR')}`, 'var(--green)');
+    if (forcado) toast(`Enviado! ${links.length} produto(s) único(s) mandados pro Monitor Shopee.`, 'ok');
+  } catch (ex) {
+    setStatus('Erro ao enviar: ' + ex.message, 'var(--red)');
+    if (forcado) toast('Erro ao sincronizar: ' + ex.message, 'warn');
+  }
+}
+
 async function atualizarMetaStatusOrcamento() {
   const btn = document.getElementById('btn-atualizar-meta-status');
   const metaAtivas = CFG_META.filter(c => c.ativo && c.accountId && c.token);
@@ -8093,6 +8215,8 @@ function _prepararFiscalMetaCache() {
 // OPERAÇÕES — mapeamento sub_id → operação
 // ═══════════════════════════════════════════
 let CFG_CAMPANHAS = carregar('cfg_campanhas', {}); // { sub_id: { plataforma, orcamento } }
+let CFG_MONITOR_SHOPEE = carregar('cfg_monitor_shopee', { url: '', ativo: false, ultimaSync: null });
+let _monitorShopeeSincronizadoNestaSessao = false; // evita reenviar toda vez que troca de aba dentro da mesma sessão
 
 // META GMV — estado global
 let MGV_CONFIG    = carregar('mgv_config', {});    // { 'ACCENDA|2026-06': {meta1,pct1,...} }
@@ -16648,6 +16772,13 @@ function initConfig() {
   const a = document.getElementById('cfg-aliquota');    if (a) a.value = ((CFG.aliquota_cnpj||0.06)*100).toFixed(2);
   const b = document.getElementById('cfg-cancelamento'); if (b) b.value = ((CFG.cancelamento||0.08)*100).toFixed(1);
   const r = document.getElementById('cfg-roas-fator');  if (r) r.value = (CFG.roas_liq_fator||0.826).toFixed(3);
+  // Monitor Shopee — preenche URL/checkbox e mostra a última sincronização, se houver
+  const msUrl = document.getElementById('monitor-shopee-url');   if (msUrl) msUrl.value = CFG_MONITOR_SHOPEE.url || '';
+  const msAtivo = document.getElementById('monitor-shopee-ativo'); if (msAtivo) msAtivo.checked = !!CFG_MONITOR_SHOPEE.ativo;
+  const msStatus = document.getElementById('monitor-shopee-status');
+  if (msStatus && CFG_MONITOR_SHOPEE.ultimaSync) {
+    msStatus.textContent = 'Última sincronização: ' + new Date(CFG_MONITOR_SHOPEE.ultimaSync).toLocaleString('pt-BR');
+  }
   // Restaura faixas de classificação de campanha (se já tiver sido salva antes —
   // senão fica nos valores padrão que já estão no HTML)
   if (CFG.mgd) {
@@ -17047,6 +17178,7 @@ _carregarConfigServidor().then(carregouServidor => {
   _ajustarAlturaTabelaDash();
   _restaurarEstadoBlurNomes();
   _restaurarEstadoDarkMode();
+  sincronizarMonitorShopee(false); // envia links ativos pro Monitor Shopee automaticamente, se estiver ativado
 });
 </script>
 </body>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Financeiro — Juliane & Hugo</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #111;
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  padding: 16px;
+  color: #e0e0e0;
+}
+.wrap { max-width: 1200px; margin: 0 auto; }
+
+.main-header { margin-bottom: 18px; }
+.main-header h1 { font-size: 20px; font-weight: 700; color: #e0e0e0; margin-bottom: 2px; }
+.main-header .sub { font-size: 12px; color: #888; }
+
+/* SEÇÕES */
+.section-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.section-tab {
+  font-size: 12px; padding: 8px 18px; border-radius: 8px; border: 1px solid #444;
+  background: #1a1a1a; cursor: pointer; color: #888; font-weight: 600;
+}
+.section-tab.active { background: #e0e0e0; color: #1a1a1a; border-color: #e0e0e0; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* SUB-ABAS */
+.tab-bar { display: flex; gap: 5px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab {
+  font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid #383838;
+  background: transparent; cursor: pointer; color: #888;
+}
+.tab.active { background: #333; color: #e0e0e0; border-color: #555; font-weight: 600; }
+.tc { display: none; }
+.tc.active { display: block; }
+
+/* KPIs */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.kpi { background: #222; border-radius: 10px; padding: 13px; }
+.kpi .l { font-size: 10px; color: #888; margin-bottom: 5px; line-height: 1.4; }
+.kpi .v { font-size: 18px; font-weight: 700; }
+.kpi .s { font-size: 10px; color: #666; margin-top: 3px; }
+.kpi .v.amber { color: #ffb347; }
+.kpi .v.green { color: #6dbf6d; }
+.kpi .v.red { color: #ff7070; }
+
+/* CARDS */
+.card { background: #222; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.ch { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 7px; }
+.ct { font-size: 13px; font-weight: 600; color: #e8e8e8; }
+.cv { font-size: 15px; font-weight: 700; }
+.badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 20px; margin-bottom: 9px; }
+.bg { background: #1a3a1a; color: #6dbf6d; }
+.br { background: #6b1a1a; color: #ff7070; }
+.ba { background: #5a3d00; color: #ffb347; }
+.row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 7px 0; border-bottom: 0.5px solid #2e2e2e; font-size: 12px; gap: 8px;
+}
+.row:last-child { border-bottom: none; }
+.rn { color: #bbb; flex: 1; line-height: 1.5; }
+.rs { font-size: 10px; color: #666; display: block; margin-top: 1px; }
+.rv { font-weight: 600; white-space: nowrap; }
+.rv.red { color: #ff7070; }
+.rv.green { color: #6dbf6d; }
+.rv.amber { color: #ffb347; }
+
+/* GRID */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+
+/* PROGRESS BARS */
+.prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.prog-label { width: 150px; font-size: 11px; color: #bbb; text-align: right; flex-shrink: 0; }
+.prog-track { flex: 1; background: #2e2e2e; border-radius: 3px; height: 20px; overflow: hidden; }
+.prog-fill {
+  height: 100%; border-radius: 3px; display: flex; align-items: center;
+  padding-left: 6px; font-size: 10px; font-weight: 700; color: white;
+}
+
+/* TIMELINE */
+.tl-item { display: flex; gap: 14px; padding: 10px 0; border-bottom: 0.5px solid #2e2e2e; }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { min-width: 54px; font-size: 11px; font-weight: 700; }
+.tl-body { flex: 1; }
+.tl-desc { font-size: 11px; color: #bbb; line-height: 1.7; }
+.tl-save { font-size: 12px; font-weight: 700; margin-top: 3px; }
+
+.red { color: #ff7070; }
+.green { color: #6dbf6d; }
+.amber { color: #ffb347; }
+.blue { color: #7ab8f5; }
+
+.alert {
+  border-radius: 10px; padding: 13px 15px; margin-bottom: 10px;
+  border-left: 4px solid #ff7070;
+}
+.alert.red { background: #2a0f0f; }
+.alert.amber { background: #2a1e00; border-left-color: #ffb347; }
+.alert.green { background: #0f2a0f; border-left-color: #6dbf6d; }
+.alert-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.alert-body { font-size: 12px; line-height: 1.7; }
+
+.sec {
+  font-size: 11px; font-weight: 700; color: #888;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin: 1.2rem 0 0.7rem;
+}
+
+/* CHARTS */
+.chart-bars { display: flex; gap: 4px; align-items: flex-end; height: 100px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.bar {
+  flex: 1; width: 100%; border-radius: 3px 3px 0 0;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 2px; font-size: 8px; font-weight: 700; color: white;
+}
+.bar.in { background: #2a5a2a; }
+.bar.out { background: #5a1a1a; }
+.bar-label { font-size: 9px; color: #888; margin-top: 8px; }
+.bar-val { font-size: 9px; font-weight: 700; margin-top: 4px; }
+
+.loader { text-align: center; padding: 40px; color: #888; }
+.error { background: #2a0f0f; border: 1px solid #6b1a1a; padding: 14px; border-radius: 10px; color: #ff7070; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="main-header">
+  <h1>Diagnóstico financeiro — Juliane & Hugo</h1>
+  <div class="sub" id="header-sub">Carregando...</div>
+</div>
+
+<div id="loader" class="loader">⏳ Carregando dados...</div>
+
+<div id="content" style="display:none;">
+
+<div class="section-tabs">
+  <button class="section-tab active" onclick="showSection('diagnostico')">📋 Diagnóstico</button>
+  <button class="section-tab" onclick="showSection('fluxo')">💸 Fluxo de caixa</button>
+</div>
+
+<!-- DIAGNÓSTICO -->
+<div id="section-diagnostico" class="section active">
+
+  <div class="kpis" id="kpis-diagnostico"></div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('diagnostico','dividas')">🏦 Dívidas</button>
+    <button class="tab" onclick="showTab('diagnostico','fluxo-mensal')">💸 Fluxo mensal</button>
+    <button class="tab" onclick="showTab('diagnostico','gastos')">📊 Gastos</button>
+  </div>
+
+  <!-- DÍVIDAS -->
+  <div id="diagnostico-dividas" class="tc active">
+    <div class="grid" id="dividas-grid"></div>
+    <div id="total-dividas" style="background:#1e1e1e; border-radius:10px; padding:14px 16px; margin-top:14px;"></div>
+  </div>
+
+  <!-- FLUXO MENSAL -->
+  <div id="diagnostico-fluxo-mensal" class="tc">
+    <div id="fluxo-mensal-content"></div>
+  </div>
+
+  <!-- GASTOS -->
+  <div id="diagnostico-gastos" class="tc">
+    <div class="sec">Onde vai o dinheiro todo mês</div>
+    <div id="gastos-bars"></div>
+    <div id="gastos-grid"></div>
+  </div>
+
+</div>
+
+<!-- FLUXO DE CAIXA -->
+<div id="section-fluxo" class="section">
+  <div class="kpis" id="kpis-fluxo"></div>
+  <div id="fluxo-content"></div>
+</div>
+
+</div><!-- FIM CONTENT -->
+
+</div><!-- FIM WRAP -->
+
+<script>
+const API_URL = '/api/dados';
+let dados = null;
+
+async function loadData() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    dados = await res.json();
+    renderDashboard();
+  } catch (err) {
+    console.error('Erro carregando dados:', err);
+    document.getElementById('loader').innerHTML = `<div class="error">Erro: ${err.message}</div>`;
+  }
+}
+
+function renderDashboard() {
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  renderHeader();
+  renderDiagnostico();
+  renderFluxo();
+}
+
+function renderHeader() {
+  const data = dados.metadata?.data_atualizacao || 'hoje';
+  const saldo = formatMoney(dados.contas?.saldo_total || 0);
+  document.getElementById('header-sub').textContent =
+    `Atualizado ${data} · Saldo conta ${saldo}`;
+}
+
+function renderDiagnostico() {
+  // KPIs
+  const kpis = [
+    { label: 'Salário líquido Juliane', value: dados.receitas?.salario_juliane?.atual, class: 'amber' },
+    { label: 'Hugo líquido (táxi - combustível)', value: dados.receitas?.hugo_taxi?.liquido, class: 'green' },
+    { label: 'Saldo conta hoje', value: dados.contas?.saldo_total, class: 'green' },
+    { label: 'Dívida pessoal total', value: dados.dividas?.total, class: 'red' },
+    { label: 'Fatura Black mai/26', value: dados.dividas?.cartao_black?.fatura_atual, class: 'green' },
+    { label: 'Mercado Pago', value: dados.dividas?.mercado_pago?.parcela_mensal, class: 'red', sub: '6x até nov/26' }
+  ];
+
+  document.getElementById('kpis-diagnostico').innerHTML = kpis.map(kpi => `
+    <div class="kpi">
+      <div class="l">${kpi.label}</div>
+      <div class="v ${kpi.class}">${formatMoney(kpi.value)}</div>
+      ${kpi.sub ? `<div class="s">${kpi.sub}</div>` : ''}
+    </div>
+  `).join('');
+
+  // Dívidas
+  const dividas = [
+    {
+      titulo: 'Créditos consignados (folha)',
+      valor: dados.dividas?.consignados_folha?.total,
+      badge: `R$${dados.dividas?.consignados_folha?.parcela_mensal}/mês descontado na folha`,
+      itens: dados.dividas?.consignados_folha?.itens || []
+    },
+    {
+      titulo: 'Consignado conta corrente',
+      valor: dados.dividas?.consignado_cc?.saldo,
+      badge: `R$${dados.dividas?.consignado_cc?.parcela_mensal}/mês · até ${dados.dividas?.consignado_cc?.termina}`,
+      itens: []
+    },
+    {
+      titulo: 'Empréstimo Cenira',
+      valor: dados.dividas?.emprestimo_cenira?.saldo,
+      badge: `R$${dados.dividas?.emprestimo_cenira?.parcela_mensal}/mês · até ${dados.dividas?.emprestimo_cenira?.termina}`,
+      itens: []
+    },
+    {
+      titulo: 'Mastercard Black',
+      valor: dados.dividas?.cartao_black?.fatura_atual,
+      badge: 'Pago integralmente',
+      itens: []
+    }
+  ];
+
+  document.getElementById('dividas-grid').innerHTML = dividas.map(d => `
+    <div class="card">
+      <div class="ch">
+        <div class="ct">${d.titulo}</div>
+        <div class="cv red">${formatMoney(d.valor)}</div>
+      </div>
+      <div class="badge br">${d.badge}</div>
+      ${d.itens.map(i => `
+        <div class="row">
+          <div class="rn">${i.nome}<span class="rs">${i.parcela_mensal || ''}/mês · termina ${i.termina}</span></div>
+          <div class="rv red">${formatMoney(i.saldo)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  // Total dívidas
+  document.getElementById('total-dividas').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="font-size:13px; font-weight:700; color:#e0e0e0;">Total dívidas pessoais</div>
+      <div style="font-size:22px; font-weight:700; color:#ff7070;">${formatMoney(dados.dividas?.total)}</div>
+    </div>
+  `;
+
+  // Fluxo mensal
+  renderFluxoMensal();
+
+  // Gastos
+  renderGastos();
+}
+
+function renderFluxoMensal() {
+  const entradas = dados.receitas?.total_mensal || 5750;
+  const saidas = dados.despesas?.total_mensal || 10974;
+  const deficit = -(entradas - saidas);
+
+  const html = `
+    <div class="card">
+      <div class="ch"><div class="ct">💚 Entradas mensais reais</div><div class="cv green">${formatMoney(entradas)}</div></div>
+      <div class="badge bg">Corrigido com números reais</div>
+      <div class="row"><span class="rn">Salário líquido Elektro</span><span class="rv green">${formatMoney(dados.receitas?.salario_juliane?.bruto_referencia)}</span></div>
+      <div class="row"><span class="rn">Hugo — renda táxi bruta<span class="rs">${formatMoney(dados.receitas?.hugo_taxi?.bruto)}/mês</span></span><span class="rv amber">${formatMoney(dados.receitas?.hugo_taxi?.bruto)}</span></div>
+      <div class="row"><span class="rn">(-) Combustível Hugo<span class="rs">Custo operacional</span></span><span class="rv red">-${formatMoney(dados.receitas?.hugo_taxi?.combustivel)}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">🔴 Saídas fixas mensais</div><div class="cv red">${formatMoney(saidas)}</div></div>
+      <div class="badge br">Comprometimento atual</div>
+      ${renderDespesasItem()}
+    </div>
+
+    <div class="alert red">
+      <div class="alert-title">🔴 Déficit mensal: ${formatMoney(deficit)}</div>
+      <div class="alert-body">Entradas ${formatMoney(entradas)} vs saídas ${formatMoney(saidas)}. O déficit está sendo coberto por empréstimos.</div>
+    </div>
+  `;
+
+  document.getElementById('diagnostico-fluxo-mensal').innerHTML = html;
+}
+
+function renderDespesasItem() {
+  const despesas = dados.despesas?.fixas || {};
+  let html = '';
+
+  for (const [chave, cat] of Object.entries(despesas)) {
+    if (chave === 'fatura_black_estimada') continue;
+    if (cat.total) {
+      html += `<div class="sec">${cat.total ? `${chave.replace(/_/g, ' ').toUpperCase()} — ${formatMoney(cat.total)}` : ''}</div>`;
+      if (cat.itens) {
+        cat.itens.forEach(item => {
+          html += `<div class="row"><div class="rn">${item.nome}</div><div class="rv">${formatMoney(item.valor)}</div></div>`;
+        });
+      }
+    }
+  }
+
+  return html;
+}
+
+function renderGastos() {
+  const despesas = dados.despesas?.fixas || {};
+  const categorias = [
+    { key: 'fatura_black_estimada', label: 'Fatura Black', color: '#A32D2D' },
+    { key: 'escola_educacao', label: 'Escola (2 filhos + van)', color: '#378ADD' },
+    { key: 'dividas', label: 'Consignado + Cenira', color: '#A32D2D' },
+    { key: 'casa', label: 'Casa (condo+luz+água)', color: '#639922' },
+    { key: 'outros', label: 'Outros fixos', color: '#EF9F27' }
+  ];
+
+  let barsHtml = '';
+  categorias.forEach(cat => {
+    const valor = despesas[cat.key]?.total || 0;
+    const pct = (valor / 5000) * 100;
+    barsHtml += `
+      <div class="prog-row">
+        <div class="prog-label">${cat.label}</div>
+        <div class="prog-track">
+          <div class="prog-fill" style="width:${Math.min(pct, 100)}%; background:${cat.color};">
+            ${cat.label}
+          </div>
+        </div>
+        <div class="prog-val" style="color:${cat.color};">${formatMoney(valor)}</div>
+      </div>
+    `;
+  });
+
+  document.getElementById('gastos-bars').innerHTML = barsHtml;
+}
+
+function renderFluxo() {
+  const entradas = dados.receitas?.total_mensal || 5750;
+  const deficit = dados.analise?.deficit_mensal || -5224;
+  const saldo = dados.contas?.saldo_total || 5587;
+
+  const kpis = [
+    { label: 'Entradas confiáveis', value: entradas, class: 'green' },
+    { label: 'Déficit estrutural', value: Math.abs(deficit), class: 'red' },
+    { label: 'Saldo hoje', value: saldo, class: 'green' }
+  ];
+
+  document.getElementById('kpis-fluxo').innerHTML = kpis.map(kpi => `
+    <div class="kpi">
+      <div class="l">${kpi.label}</div>
+      <div class="v ${kpi.class}">${formatMoney(kpi.value)}</div>
+    </div>
+  `).join('');
+
+  const html = `
+    <div class="alert red">
+      <div class="alert-title">🔴 O problema central</div>
+      <div class="alert-body">Entradas reais ${formatMoney(entradas)} vs saídas fixas ${formatMoney(Math.abs(deficit) + entradas)}. Buraco de ${formatMoney(Math.abs(deficit))}/mês.</div>
+    </div>
+
+    <div class="alert green">
+      <div class="alert-title">✅ Boa notícia</div>
+      <div class="alert-body">O déficit melhora naturalmente até fev/27 com o fim dos parcelamentos do Black (Airbnb em jun/26, Kiwify em jan/27).</div>
+    </div>
+
+    ${renderAlivios()}
+  `;
+
+  document.getElementById('fluxo-content').innerHTML = html;
+}
+
+function renderAlivios() {
+  const alivios = dados.analise?.alivios_programados || [];
+
+  let html = '<div class="card"><div style="font-size:13px; font-weight:700; margin-bottom:12px;">Alívios automáticos chegando</div>';
+
+  alivios.forEach(a => {
+    html += `
+      <div class="tl-item">
+        <div class="tl-date green">${a.mes}</div>
+        <div class="tl-body">
+          <div class="tl-desc">${a.descricao}</div>
+          <div class="tl-save green">↓ +${formatMoney(a.economia)} liberados</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function formatMoney(valor) {
+  if (!valor) return 'R$0';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showTab(section, name) {
+  const sec = document.getElementById('section-' + section);
+  sec.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  sec.querySelectorAll('.tc').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById(section + '-' + name);
+  if (el) el.classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Carrega dados ao abrir
+loadData();
+</script>
+</body>
+</html>

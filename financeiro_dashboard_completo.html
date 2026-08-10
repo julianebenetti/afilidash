@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico Financeiro — Juliane & Hugo 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #111;
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  padding: 16px;
+  color: #e0e0e0;
+}
+.wrap { max-width: 1200px; margin: 0 auto; }
+
+.header { margin-bottom: 18px; }
+.header h1 { font-size: 20px; font-weight: 700; color: #e0e0e0; }
+.header .sub { font-size: 12px; color: #888; }
+
+/* TABS */
+.section-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.section-tab {
+  font-size: 12px; padding: 8px 18px; border-radius: 8px; border: 1px solid #444;
+  background: #1a1a1a; cursor: pointer; color: #888; font-weight: 600;
+  transition: 0.15s;
+}
+.section-tab:hover { border-color: #666; }
+.section-tab.active { background: #e0e0e0; color: #1a1a1a; border-color: #e0e0e0; }
+.section { display: none; }
+.section.active { display: block; }
+
+.tab-bar { display: flex; gap: 5px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab {
+  font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid #383838;
+  background: transparent; cursor: pointer; color: #888; transition: 0.15s;
+}
+.tab.active { background: #333; color: #e0e0e0; border-color: #555; }
+.tc { display: none; }
+.tc.active { display: block; }
+
+/* KPIs */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.kpi { background: #222; border-radius: 10px; padding: 13px; }
+.kpi .l { font-size: 10px; color: #888; margin-bottom: 5px; }
+.kpi .v {
+  font-size: 18px; font-weight: 700;
+  &.amber { color: #ffb347; }
+  &.green { color: #6dbf6d; }
+  &.red { color: #ff7070; }
+}
+.kpi .s { font-size: 10px; color: #666; margin-top: 3px; }
+
+/* CARDS */
+.card { background: #222; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.ch { display: flex; justify-content: space-between; margin-bottom: 7px; }
+.ct { font-size: 13px; font-weight: 600; color: #e8e8e8; }
+.cv { font-size: 15px; font-weight: 700; }
+.badge {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  padding: 2px 9px; border-radius: 20px; margin-bottom: 9px;
+}
+.badge.green { background: #1a3a1a; color: #6dbf6d; }
+.badge.red { background: #6b1a1a; color: #ff7070; }
+.badge.amber { background: #5a3d00; color: #ffb347; }
+
+.row {
+  display: flex; justify-content: space-between;
+  padding: 7px 0; border-bottom: 0.5px solid #2e2e2e;
+  font-size: 12px; gap: 8px;
+}
+.row:last-child { border-bottom: none; }
+.rn { color: #bbb; flex: 1; line-height: 1.5; }
+.rs { font-size: 10px; color: #666; display: block; margin-top: 1px; }
+.rv { font-weight: 600; white-space: nowrap; }
+.rv.red { color: #ff7070; }
+.rv.green { color: #6dbf6d; }
+.rv.amber { color: #ffb347; }
+
+/* ALERTS */
+.alert {
+  border-radius: 10px; padding: 13px 15px; margin-bottom: 10px;
+  border-left: 4px solid #888;
+}
+.alert.red { background: #2a0f0f; border-left-color: #ff7070; }
+.alert.amber { background: #2a1e00; border-left-color: #ffb347; }
+.alert.green { background: #0f2a0f; border-left-color: #6dbf6d; }
+.alert-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.alert-body { font-size: 12px; line-height: 1.7; }
+
+.sec {
+  font-size: 11px; font-weight: 700; color: #888;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin: 1.2rem 0 0.7rem;
+}
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+
+/* PROGRESS */
+.prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.prog-label { width: 150px; font-size: 11px; color: #bbb; text-align: right; flex-shrink: 0; }
+.prog-track { flex: 1; background: #2e2e2e; border-radius: 3px; height: 20px; overflow: hidden; }
+.prog-fill {
+  height: 100%; border-radius: 3px; display: flex; align-items: center;
+  padding-left: 6px; font-size: 10px; font-weight: 700; color: white;
+}
+
+/* TIMELINE */
+.tl-item { display: flex; gap: 14px; padding: 10px 0; border-bottom: 0.5px solid #2e2e2e; }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { min-width: 54px; font-size: 11px; font-weight: 700; }
+.tl-body { flex: 1; }
+.tl-desc { font-size: 11px; color: #bbb; line-height: 1.7; }
+.tl-save { font-size: 12px; font-weight: 700; margin-top: 3px; }
+
+/* CICLO */
+.ciclo { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.ciclo-item {
+  background: #222; border-radius: 8px; padding: 8px 12px;
+  font-size: 11px; color: #bbb; text-align: center; min-width: 90px;
+  border: 1px solid #6b1a1a; color: #ff7070;
+}
+.ciclo-arrow { color: #666; font-size: 14px; }
+
+/* SCENARIO CARDS */
+.scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.sc {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid #3a3a3a;
+}
+.sc-header { padding: 14px 16px; background: #1a1a1a; }
+.sc-icon { font-size: 20px; margin-bottom: 6px; }
+.sc-title { font-size: 14px; font-weight: 700; color: #e0e0e0; }
+.sc-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
+.sc-body { background: #1e1e1e; padding: 14px 16px; }
+
+.sc.danger .sc-header { background: #2a0a0a; border-bottom: 1px solid #6b1a1a; }
+.sc.danger .sc-subtitle { color: #ff9090; }
+.sc.positive .sc-header { background: #0a2a0a; border-bottom: 1px solid #1a5a1a; }
+.sc.positive .sc-subtitle { color: #90dd90; }
+
+.result-box {
+  border-radius: 8px; padding: 10px 12px; margin-top: 10px;
+}
+.result-box .rl { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+.result-box .rv2 { font-size: 20px; font-weight: 700; }
+.result-box.red { background: #2a0f0f; }
+.result-box.red .rl, .result-box.red .rv2 { color: #ff7070; }
+.result-box.green { background: #0f2a0f; }
+.result-box.green .rl, .result-box.green .rv2 { color: #6dbf6d; }
+
+.loader { text-align: center; padding: 40px; color: #888; }
+.error { background: #2a0f0f; border: 1px solid #6b1a1a; padding: 14px; border-radius: 10px; color: #ff7070; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <h1>Diagnóstico financeiro pessoal — Juliane & Hugo · 2026</h1>
+  <div class="sub" id="header-sub">Atualizado 08/06/2026</div>
+</div>
+
+<div id="loader" class="loader">⏳ Carregando dados...</div>
+
+<div id="content" style="display:none;">
+
+<div class="section-tabs">
+  <button class="section-tab active" onclick="showSection('diagnostico')">📋 Diagnóstico</button>
+  <button class="section-tab" onclick="showSection('fluxo')">💸 Fluxo de caixa</button>
+  <button class="section-tab" onclick="showSection('cenarios')">🔀 Cenários</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SEÇÃO 1: DIAGNÓSTICO -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="section-diagnostico" class="section active">
+
+  <div class="kpis" id="kpis-diag"></div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('diagnostico','dividas')">🏦 Dívidas</button>
+    <button class="tab" onclick="showTab('diagnostico','fluxo-m')">💸 Fluxo mensal</button>
+    <button class="tab" onclick="showTab('diagnostico','gastos')">📊 Gastos</button>
+    <button class="tab" onclick="showTab('diagnostico','progresso')">📈 Progresso</button>
+    <button class="tab" onclick="showTab('diagnostico','plano')">✂️ Plano</button>
+  </div>
+
+  <!-- DÍVIDAS -->
+  <div id="diagnostico-dividas" class="tc active">
+    <div class="grid" id="dividas-cards"></div>
+  </div>
+
+  <!-- FLUXO MENSAL -->
+  <div id="diagnostico-fluxo-m" class="tc">
+    <div id="fluxo-mensal-content"></div>
+  </div>
+
+  <!-- GASTOS -->
+  <div id="diagnostico-gastos" class="tc">
+    <div class="sec">Onde vai o dinheiro</div>
+    <div id="gastos-bars"></div>
+  </div>
+
+  <!-- PROGRESSO -->
+  <div id="diagnostico-progresso" class="tc">
+    <div class="sec">Fatura Black — evolução</div>
+    <div class="card" id="progresso-content"></div>
+  </div>
+
+  <!-- PLANO -->
+  <div id="diagnostico-plano" class="tc">
+    <div id="plano-content"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SEÇÃO 2: FLUXO DE CAIXA -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="section-fluxo" class="section">
+
+  <div class="kpis" id="kpis-fluxo"></div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('fluxo','visao')">📊 Visão geral</button>
+    <button class="tab" onclick="showTab('fluxo','ciclo')">🔄 O ciclo</button>
+  </div>
+
+  <!-- VISÃO GERAL -->
+  <div id="fluxo-visao" class="tc active">
+    <div id="fluxo-visao-content"></div>
+  </div>
+
+  <!-- CICLO -->
+  <div id="fluxo-ciclo" class="tc">
+    <div id="fluxo-ciclo-content"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SEÇÃO 3: CENÁRIOS -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="section-cenarios" class="section">
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('cenarios','todos')">🔀 Todos</button>
+    <button class="tab" onclick="showTab('cenarios','black')">💳 Não pagar</button>
+    <button class="tab" onclick="showTab('cenarios','comparativo')">📊 Comparativo</button>
+    <button class="tab" onclick="showTab('cenarios','recomendacao')">🎯 Recomendação</button>
+  </div>
+
+  <!-- TODOS OS CENÁRIOS -->
+  <div id="cenarios-todos" class="tc active">
+    <div class="scenario-grid" id="cenarios-cards"></div>
+  </div>
+
+  <!-- DETALHES NÃO PAGAR -->
+  <div id="cenarios-black" class="tc">
+    <div id="cenarios-black-content"></div>
+  </div>
+
+  <!-- COMPARATIVO -->
+  <div id="cenarios-comparativo" class="tc">
+    <div id="cenarios-comp-content"></div>
+  </div>
+
+  <!-- RECOMENDAÇÃO -->
+  <div id="cenarios-recomendacao" class="tc">
+    <div id="cenarios-rec-content"></div>
+  </div>
+
+</div>
+
+</div><!-- FIM CONTENT -->
+
+</div><!-- FIM WRAP -->
+
+<script>
+const API_URL = '/api/dados';
+let D = null;
+
+async function init() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    D = await res.json();
+    render();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('loader').innerHTML = `<div class="error">Erro: ${err.message}</div>`;
+  }
+}
+
+function render() {
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  renderDiagnostico();
+  renderFluxo();
+  renderCenarios();
+}
+
+function money(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+}
+
+function renderDiagnostico() {
+  const d = D;
+
+  // KPIs
+  const kpis = `
+    <div class="kpi"><div class="l">Salário líquido Juliane</div><div class="v amber">${money(d.receitas?.salario_juliane?.atual)}</div><div class="s">mai/26 — holerite pendente</div></div>
+    <div class="kpi"><div class="l">Hugo líquido (táxi - combustível)</div><div class="v amber">${money(d.receitas?.hugo_taxi?.liquido)}</div></div>
+    <div class="kpi"><div class="l">Saldo conta hoje</div><div class="v green">${money(d.contas?.saldo_total)}</div><div class="s">08/06/2026</div></div>
+    <div class="kpi"><div class="l">Dívida pessoal total</div><div class="v red">${money(d.dividas?.total)}</div></div>
+    <div class="kpi"><div class="l">Fatura Black mai/26</div><div class="v green">${money(d.dividas?.cartao_black?.fatura_atual)} ✅ paga</div></div>
+    <div class="kpi"><div class="l">Mercado Pago (novo)</div><div class="v red">6x ${money(d.dividas?.mercado_pago?.parcela_mensal)}</div><div class="s">vence dia 16 · até nov/26</div></div>
+  `;
+  document.getElementById('kpis-diag').innerHTML = kpis;
+
+  // Dívidas
+  const dividas_html = `
+    <div class="card">
+      <div class="ch"><div class="ct">Créditos consignados (folha)</div><div class="cv red">${money(d.dividas?.consignados_folha?.total)}</div></div>
+      <div class="badge red">R$${d.dividas?.consignados_folha?.parcela_mensal}/mês descontado direto na folha</div>
+      ${(d.dividas?.consignados_folha?.itens || []).map(i => `
+        <div class="row"><div class="rn">${i.nome}<span class="rs">R$${i.parcela_mensal}/mês · termina ${i.termina}</span></div><div class="rv red">${money(i.saldo)}</div></div>
+      `).join('')}
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2e2e2e; font-size:11px; color:#ff7070;">Margem consignável esgotada.</div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Consignado conta corrente</div><div class="cv red">${money(d.dividas?.consignado_cc?.saldo)}</div></div>
+      <div class="badge red">R$${d.dividas?.consignado_cc?.parcela_mensal}/mês · até ${d.dividas?.consignado_cc?.termina}</div>
+      <div class="row"><div class="rn">Parcela 32/60 · contratado jul/2023</div><div class="rv red">${money(d.dividas?.consignado_cc?.saldo)}</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Empréstimo Cenira</div><div class="cv red">${money(d.dividas?.emprestimo_cenira?.saldo)}</div></div>
+      <div class="badge red">R$${d.dividas?.emprestimo_cenira?.parcela_mensal}/mês · até ${d.dividas?.emprestimo_cenira?.termina}</div>
+      <div class="row"><div class="rn">36 parcelas<span class="rs">R$${d.dividas?.emprestimo_cenira?.valor_recebido} recebido</span></div><div class="rv red">${money(d.dividas?.emprestimo_cenira?.saldo)}</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Mastercard Black (final ${d.dividas?.cartao_black?.ultimos_4})</div><div class="cv green">${money(d.dividas?.cartao_black?.fatura_atual)}</div></div>
+      <div class="badge green">Caindo há 3 meses · pago integralmente</div>
+      <div class="row"><div class="rn">Fatura mai/26 · vence 26/05<span class="rs">Nunca entrou no rotativo ✅</span></div><div class="rv green">${money(d.dividas?.cartao_black?.fatura_atual)}</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Bradesco Amazon Platinum</div><div class="cv green">${money(d.dividas?.bradesco_amazon?.saldo)}</div></div>
+      <div class="badge green">Praticamente zerado</div>
+      <div class="row"><div class="rn">2 parcelas Amazon</div><div class="rv green">${money(d.dividas?.bradesco_amazon?.saldo)}</div></div>
+    </div>
+  `;
+  document.getElementById('dividas-cards').innerHTML = dividas_html;
+
+  // Fluxo Mensal
+  const fluxo_html = `
+    <div class="card">
+      <div class="ch"><div class="ct">💚 Entradas mensais reais</div><div class="cv green">${money(d.receitas?.total_mensal)}</div></div>
+      <div class="badge green">Corrigido com números reais</div>
+      <div class="row"><span class="rn">Salário líquido Elektro (após descontos)</span><span class="rv green">~${money(d.receitas?.salario_juliane?.bruto_referencia)}</span></div>
+      <div class="row"><span class="rn">Hugo — renda táxi bruta<span class="rs">R$${d.receitas?.hugo_taxi?.bruto}/mês</span></span><span class="rv amber">${money(d.receitas?.hugo_taxi?.bruto)}</span></div>
+      <div class="row"><span class="rn">(-) Combustível Hugo (custo operacional)<span class="rs">Sai do cartão Black</span></span><span class="rv red">-${money(d.receitas?.hugo_taxi?.combustivel)}</span></div>
+      <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><span class="rn" style="font-weight:700;">TOTAL ENTRADAS REAIS</span><span class="rv green" style="font-size:15px;">${money(d.receitas?.total_mensal)}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">🔴 Saídas fixas mensais</div><div class="cv red">${money(d.despesas?.total_mensal)}</div></div>
+      <div class="badge red">Comprometimento atual</div>
+      <div class="sec">Escola e educação — ${money(d.despesas?.fixas?.escola_educacao?.total)}</div>
+      ${(d.despesas?.fixas?.escola_educacao?.itens || []).map(i => `
+        <div class="row"><div class="rn">${i.nome}</div><div class="rv red">${money(i.valor)}</div></div>
+      `).join('')}
+      <div class="sec">Dívidas — ${money(d.despesas?.fixas?.dividas?.total)}</div>
+      ${(d.despesas?.fixas?.dividas?.itens || []).map(i => `
+        <div class="row"><div class="rn">${i.nome}</div><div class="rv red">${money(i.valor)}</div></div>
+      `).join('')}
+    </div>
+
+    <div class="alert red">
+      <div class="alert-title">🔴 Déficit mensal: ${money(Math.abs(d.analise?.deficit_mensal))}</div>
+      <div class="alert-body">Entradas ${money(d.receitas?.total_mensal)} vs saídas ${money(d.despesas?.total_mensal)}. O déficit está sendo coberto por empréstimos e entradas irregulares.</div>
+    </div>
+  `;
+  document.getElementById('diagnostico-fluxo-m').innerHTML = fluxo_html;
+
+  // Gastos
+  const gastos_html = `
+    ${[
+      { label: 'Fatura Black', val: d.despesas?.fixas?.fatura_black_estimada?.total, color: '#A32D2D' },
+      { label: 'Escola (2 filhos + van)', val: d.despesas?.fixas?.escola_educacao?.total, color: '#378ADD' },
+      { label: 'Consignado C/C + Cenira', val: d.despesas?.fixas?.dividas?.total, color: '#A32D2D' },
+      { label: 'Casa', val: d.despesas?.fixas?.casa?.total, color: '#639922' },
+      { label: 'Outros', val: d.despesas?.fixas?.outros?.total, color: '#EF9F27' }
+    ].map(g => `
+      <div class="prog-row">
+        <div class="prog-label">${g.label}</div>
+        <div class="prog-track">
+          <div class="prog-fill" style="width:${Math.min((g.val/5000)*100, 100)}%; background:${g.color};">${g.label}</div>
+        </div>
+        <div class="prog-val" style="color:${g.color};">${money(g.val)}</div>
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('gastos-bars').innerHTML = gastos_html;
+
+  // Progresso
+  const prog_html = `
+    <div style="text-align:center; font-size:11px; color:#80cc80; margin-top:10px;">
+      Queda de R$3.507 em 3 meses. Sem criar novos parcelamentos, fatura chega automaticamente em ~R$2.700 em fev/27.
+    </div>
+  `;
+  document.getElementById('progresso-content').innerHTML = prog_html;
+
+  // Plano
+  const plano_html = `
+    <div class="alert amber">
+      <div class="alert-title">⚡ Regra de ouro: não criar novos parcelamentos</div>
+      <div class="alert-body">A fatura Black vai cair sozinha até fev/27. Cada novo parcelamento repõe o que está terminando.</div>
+    </div>
+    <div class="sec">🔴 Esta semana</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong>1.</strong> Cancelar assinaturas Apple desnecessárias</div><div class="rv green">agora</div></div>
+      <div class="row"><div class="rn"><strong>2.</strong> Parar compras de roupas</div><div class="rv green">agora</div></div>
+      <div class="row"><div class="rn"><strong>3.</strong> Nenhum novo parcelamento no Black</div><div class="rv green">agora</div></div>
+    </div>
+    <div class="sec">🟡 Este mês</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong>4.</strong> Conversar com Hugo sobre divisão financeira</div><div class="rv amber">jun/26</div></div>
+      <div class="row"><div class="rn"><strong>5.</strong> Avaliar Lockers APE (R$223/mês)</div><div class="rv amber">jun/26</div></div>
+      <div class="row"><div class="rn"><strong>6.</strong> Decidir sobre negócio Shopee</div><div class="rv red">jun/26</div></div>
+    </div>
+    <div class="sec">🟢 Dezembro/2026</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong>7.</strong> Usar 13º + PLR para abater consignado C/C</div><div class="rv green">dez/26</div></div>
+    </div>
+    <div class="alert green">
+      <div class="alert-title">✅ O que você já faz certo</div>
+      <div class="alert-body">Nunca entrou no rotativo. Fatura caindo 3 meses seguidos. Todas as contas em dia. Emprego estável.</div>
+    </div>
+  `;
+  document.getElementById('plano-content').innerHTML = plano_html;
+}
+
+function renderFluxo() {
+  const d = D;
+
+  // KPIs
+  const kpis = `
+    <div class="kpi"><div class="l">Entradas confiáveis</div><div class="v green">${money(d.receitas?.total_mensal)}</div></div>
+    <div class="kpi"><div class="l">Déficit estrutural</div><div class="v red">${money(Math.abs(d.analise?.deficit_mensal))}</div></div>
+    <div class="kpi"><div class="l">Saldo hoje 08/06</div><div class="v green">${money(d.contas?.saldo_total)}</div></div>
+  `;
+  document.getElementById('kpis-fluxo').innerHTML = kpis;
+
+  // Visão Geral
+  const visao = `
+    <div class="alert red">
+      <div class="alert-title">🔴 O problema central: salário não cobre as saídas</div>
+      <div class="alert-body">Entradas ${money(d.receitas?.total_mensal)} vs Saídas ~${money(d.despesas?.total_mensal)}. Buraco de ~${money(Math.abs(d.analise?.deficit_mensal))}/mês.</div>
+    </div>
+    <div class="alert green">
+      <div class="alert-title">✅ Boa notícia: o déficit melhora naturalmente até fev/27</div>
+      <div class="alert-body">Com o fim dos parcelamentos do Black, a fatura cai de R$5.692 para ~R$2.700. Isso reduz o déficit para ~R$2.232 — sem nenhuma ação extra.</div>
+    </div>
+  `;
+  document.getElementById('fluxo-visao').innerHTML = visao;
+
+  // Ciclo
+  const ciclo = `
+    <div class="alert red">
+      <div class="alert-title">🔴 O ciclo que você identificou</div>
+      <div class="alert-body">"Os empréstimos que tenho feito são para pagar a fatura do cartão." Exatamente. Cada empréstimo adiciona uma parcela permanente.</div>
+    </div>
+    <div class="ciclo">
+      <div class="ciclo-item">Fatura alta chega</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">Conta sem saldo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">Toma empréstimo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">+R$646/mês fixo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">Caixa mais apertado</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">Próxima fatura não cabe</div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px; font-weight:700; margin-bottom:12px;">Como quebrar o ciclo</div>
+      <div class="row"><div class="rn"><strong>1.</strong> Fatura Black abaixo de R$4.000</div><div class="rv green">prioridade 1</div></div>
+      <div class="row"><div class="rn"><strong>2.</strong> Nenhum novo empréstimo</div><div class="rv green">prioridade 2</div></div>
+      <div class="row"><div class="rn"><strong>3.</strong> Reserva mínima de R$2.000</div><div class="rv green">prioridade 3</div></div>
+      <div class="row"><div class="rn"><strong>4.</strong> 13º + PLR para abater consignado</div><div class="rv green">dez/26</div></div>
+    </div>
+  `;
+  document.getElementById('fluxo-ciclo').innerHTML = ciclo;
+}
+
+function renderCenarios() {
+  // Todos
+  const scenarios = `
+    <div class="sc" style="border-color:#6b1a1a;">
+      <div class="sc-header"><div class="sc-icon">📍</div><div class="sc-title">Situação atual</div><div class="sc-subtitle">Base de comparação — mai/26</div></div>
+      <div class="sc-body">
+        <div class="row"><span class="rn">Entradas reais</span><span class="rv green">${money(D.receitas?.total_mensal)}</span></div>
+        <div class="row"><span class="rn">Saídas fixas</span><span class="rv red">${money(D.despesas?.total_mensal)}</span></div>
+        <div class="result-box red">
+          <div class="rl">Déficit mensal</div>
+          <div class="rv2">${money(Math.abs(D.analise?.deficit_mensal))}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sc" style="border-color:#6b1a1a;">
+      <div class="sc-header"><div class="sc-icon">💳</div><div class="sc-title">Não pagar o Black</div><div class="sc-subtitle">Parar de pagar a fatura</div></div>
+      <div class="sc-body">
+        <div class="row"><span class="rn">Alívio imediato</span><span class="rv amber">+${money(D.dividas?.cartao_black?.fatura_atual)}</span></div>
+        <div class="row"><span class="rn">Multa 2% imediata</span><span class="rv red">-R$114</span></div>
+        <div style="margin-top:10px; font-size:11px; color:#ff7070;margin-bottom:10px;">⚠️ Nome negativado em ~30 dias</div>
+        <div class="result-box red">
+          <div class="rl">Resultado real</div>
+          <div class="rv2">Piora</div>
+          <div class="rs">Dívida quase dobra em 6 meses</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sc" style="border-color:#1a5a1a;">
+      <div class="sc-header"><div class="sc-icon">🚖</div><div class="sc-title">Hugo contribui mais</div><div class="sc-subtitle">De R$2.350 para R$3.500 líquido</div></div>
+      <div class="sc-body">
+        <div class="row"><span class="rn">Diferença mensal</span><span class="rv green">+R$1.150</span></div>
+        <div style="margin-top:10px; font-size:11px; color:#80cc80; margin-bottom:10px;">✅ Alívio imediato sem nova dívida</div>
+        <div class="result-box green">
+          <div class="rl">Novo déficit</div>
+          <div class="rv2">-R$4.074</div>
+          <div class="rs">Melhora R$1.150/mês</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sc" style="border-color:#1a5a1a;">
+      <div class="sc-header"><div class="sc-icon">🛍️</div><div class="sc-title">Negócio Shopee lucrativo</div><div class="sc-subtitle">Se gerar R$3.000 líquido/mês</div></div>
+      <div class="sc-body">
+        <div class="row"><span class="rn">+ Lucro Shopee</span><span class="rv green">+R$3.000</span></div>
+        <div style="margin-top:10px; font-size:11px; color:#80cc80; margin-bottom:10px;">✅ Déficit cai para R$2.224</div>
+        <div class="result-box green">
+          <div class="rl">Novo déficit</div>
+          <div class="rv2">-R$2.224</div>
+          <div class="rs">Administrável</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('cenarios-cards').innerHTML = scenarios;
+
+  // Black
+  const black_html = `
+    <div class="alert red">
+      <div class="alert-title">🔴 O maior risco: seu salário cai no Itaú</div>
+      <div class="alert-body">O consignado C/C é Itaú. A fatura Black é Itaú. O banco pode reter o saldo. Se não pagar, pode acordar com o salário retido.</div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px; font-weight:700; margin-bottom:12px;">O que acontece mês a mês</div>
+      <div class="row" style="background:#1a0a0a; padding:8px; border-radius:6px; margin-bottom:6px;"><div class="rn"><strong class="red">Mês 1</strong> — vencimento não pago</div><div class="rv red">R$5.692 + multa R$114</div></div>
+      <div class="row" style="background:#1a0a0a; padding:8px; border-radius:6px; margin-bottom:6px;"><div class="rn"><strong class="red">Mês 2</strong> — 30 dias</div><div class="rv red">~R$6.580</div></div>
+      <div class="row" style="background:#1a0a0a; padding:8px; border-radius:6px;"><div class="rn"><strong class="red">Mês 3</strong> — 60 dias</div><div class="rv red">~R$7.607</div></div>
+    </div>
+  `;
+  document.getElementById('cenarios-black').innerHTML = black_html;
+
+  // Comparativo
+  const comp_html = `
+    ${[
+      { label: 'Situação atual', val: -100, color: '#A32D2D' },
+      { label: 'Não pagar Black', val: -10, color: '#6b4400' },
+      { label: 'Hugo mais corridas', val: -78, color: '#5a3d00' },
+      { label: 'Negócio Shopee', val: -43, color: '#2a5a2a' },
+      { label: 'Fatura em fev/27', val: -43, color: '#2a5a2a' },
+      { label: 'Combinação realista', val: -2, color: '#639922' }
+    ].map(c => `
+      <div style="margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#bbb; margin-bottom:3px;">
+          <span>${c.label}</span><span style="color:${c.color};">${c.val}%</span>
+        </div>
+        <div style="height:20px; background:#2e2e2e; border-radius:3px; overflow:hidden;">
+          <div style="height:100%; width:${Math.max(Math.abs(c.val), 5)}%; background:${c.color};"></div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('cenarios-comp').innerHTML = comp_html;
+
+  // Recomendação
+  const rec_html = `
+    <div class="alert green">
+      <div class="alert-title">🎯 O caminho mais realista — em ordem</div>
+      <div class="alert-body">Nenhuma ação isolada resolve. Mas 3-4 ações pequenas chegam ao equilíbrio em fev/27 sem novo empréstimo.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="green">1. Esta semana</strong> — Hugo e você conversam<span class="rs">Meta: Hugo aumentar corridas para R$3.500</span></div><div class="rv green">+R$1.150</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="green">2. Antes de 26/05</strong> — Ligar Itaú e pedir parcelamento</div><div class="rv green">alívio mai</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="amber">3. Junho</strong> — Decidir sobre Shopee</div><div class="rv amber">jun/26</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="amber">4. Continuar</strong> — Não criar parcelamentos</div><div class="rv amber">todo mês</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="blue">5. Dezembro</strong> — 13º + PLR para consignado C/C</div><div class="rv blue">dez/26</div></div>
+    </div>
+    <div style="background:#0f2a0f; border-radius:10px; padding:14px 16px; border:1px solid #1a4a1a; margin-top:10px;">
+      <div style="font-size:13px; font-weight:700; color:#6dbf6d; margin-bottom:10px;">Resultado se fizer 1 + 4 + fatura cair</div>
+      <div class="row"><span class="rn">Déficit atual</span><span class="rv red">${money(Math.abs(D.analise?.deficit_mensal))}</span></div>
+      <div class="row"><span class="rn">+ Hugo aumenta corridas</span><span class="rv green">+R$1.150</span></div>
+      <div class="row"><span class="rn">+ Fatura Black cai (fev/27)</span><span class="rv green">+R$2.992</span></div>
+      <div class="row" style="border-top:1px solid #2a5a2a; padding-top:8px;"><span class="rn" style="font-weight:700;">Déficit fev/27</span><span class="rv green" style="font-size:16px;">-R$1.082</span></div>
+    </div>
+  `;
+  document.getElementById('cenarios-rec').innerHTML = rec_html;
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showTab(section, name) {
+  const sec = document.getElementById('section-' + section);
+  sec.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  sec.querySelectorAll('.tc').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById(section + '-' + name);
+  if (el) el.classList.add('active');
+  event.target.classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>

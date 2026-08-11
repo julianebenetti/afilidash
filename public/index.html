@@ -35,7 +35,7 @@ body {
   font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid #383838;
   background: transparent; cursor: pointer; color: #888; transition: 0.15s;
 }
-.tab.active { background: #333; color: #e0e0e0; border-color: #555; }
+.tab.active { background: #333; color: #e0e0e0; border-color: #555; font-weight: 600; }
 .tc { display: none; }
 .tc.active { display: block; }
 
@@ -50,15 +50,15 @@ body {
 .kpi .l { font-size: 10px; color: #888; margin-bottom: 5px; }
 .kpi .v {
   font-size: 18px; font-weight: 700;
-  &.amber { color: #ffb347; }
-  &.green { color: #6dbf6d; }
-  &.red { color: #ff7070; }
 }
+.kpi .v.amber { color: #ffb347; }
+.kpi .v.green { color: #6dbf6d; }
+.kpi .v.red { color: #ff7070; }
 .kpi .s { font-size: 10px; color: #666; margin-top: 3px; }
 
 /* CARDS */
 .card { background: #222; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
-.ch { display: flex; justify-content: space-between; margin-bottom: 7px; }
+.ch { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 7px; }
 .ct { font-size: 13px; font-weight: 600; color: #e8e8e8; }
 .cv { font-size: 15px; font-weight: 700; }
 .badge {
@@ -70,7 +70,7 @@ body {
 .badge.amber { background: #5a3d00; color: #ffb347; }
 
 .row {
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; align-items: flex-start;
   padding: 7px 0; border-bottom: 0.5px solid #2e2e2e;
   font-size: 12px; gap: 8px;
 }
@@ -81,6 +81,14 @@ body {
 .rv.red { color: #ff7070; }
 .rv.green { color: #6dbf6d; }
 .rv.amber { color: #ffb347; }
+.rv.blue { color: #7ab8f5; }
+.gray { color: #888; }
+.red { color: #ff7070; }
+.green { color: #6dbf6d; }
+.amber { color: #ffb347; }
+
+.obs { margin-top: 10px; padding-top: 10px; border-top: 1px solid #2e2e2e; font-size: 11px; color: #999; line-height: 1.6; display: flex; gap: 7px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
 
 /* ALERTS */
 .alert {
@@ -88,8 +96,11 @@ body {
   border-left: 4px solid #888;
 }
 .alert.red { background: #2a0f0f; border-left-color: #ff7070; }
+.alert.red .alert-title, .alert.red .alert-body { color: #ff7070; }
 .alert.amber { background: #2a1e00; border-left-color: #ffb347; }
+.alert.amber .alert-title, .alert.amber .alert-body { color: #ffb347; }
 .alert.green { background: #0f2a0f; border-left-color: #6dbf6d; }
+.alert.green .alert-title, .alert.green .alert-body { color: #6dbf6d; }
 .alert-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .alert-body { font-size: 12px; line-height: 1.7; }
 
@@ -123,9 +134,22 @@ body {
 .ciclo-item {
   background: #222; border-radius: 8px; padding: 8px 12px;
   font-size: 11px; color: #bbb; text-align: center; min-width: 90px;
-  border: 1px solid #6b1a1a; color: #ff7070;
 }
+.ciclo-item.red { border: 1px solid #6b1a1a; color: #ff7070; }
 .ciclo-arrow { color: #666; font-size: 14px; }
+
+/* CHARTS */
+.chart-wrap { background: #1a1a1a; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.chart-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 14px; }
+.chart-area { display: flex; gap: 4px; align-items: flex-end; height: 140px; }
+.bar-group { flex: 1; display: flex; gap: 2px; align-items: flex-end; flex-direction: column; align-items: center; }
+.bar { border-radius: 3px 3px 0 0; flex: 1; display: flex; align-items: flex-start; justify-content: center; padding-top: 2px; font-size: 8px; font-weight: 700; color: white; min-height: 4px; }
+.bar-in { background: #2a5a2a; }
+.bar-out { background: #5a1a1a; }
+.bar-label { font-size: 9px; color: #888; margin-top: 22px; white-space: nowrap; }
+.chart-legend { display: flex; gap: 16px; margin-top: 8px; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #888; }
+.leg-dot { width: 10px; height: 10px; border-radius: 2px; }
 
 /* SCENARIO CARDS */
 .scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
@@ -138,11 +162,12 @@ body {
 .sc-title { font-size: 14px; font-weight: 700; color: #e0e0e0; }
 .sc-subtitle { font-size: 11px; color: #888; margin-top: 2px; }
 .sc-body { background: #1e1e1e; padding: 14px 16px; }
-
 .sc.danger .sc-header { background: #2a0a0a; border-bottom: 1px solid #6b1a1a; }
 .sc.danger .sc-subtitle { color: #ff9090; }
 .sc.positive .sc-header { background: #0a2a0a; border-bottom: 1px solid #1a5a1a; }
 .sc.positive .sc-subtitle { color: #90dd90; }
+.sc.blue .sc-header { background: #0a1a2a; border-bottom: 1px solid #1a3a6a; }
+.sc.blue .sc-subtitle { color: #90c0ff; }
 
 .result-box {
   border-radius: 8px; padding: 10px 12px; margin-top: 10px;
@@ -163,7 +188,7 @@ body {
 
 <div class="header">
   <h1>Diagnóstico financeiro pessoal — Juliane & Hugo · 2026</h1>
-  <div class="sub" id="header-sub">Atualizado 08/06/2026</div>
+  <div class="sub" id="header-sub">Atualizado 08/06/2026 · Saldo conta R$5.587</div>
 </div>
 
 <div id="loader" class="loader">⏳ Carregando dados...</div>
@@ -276,7 +301,7 @@ function renderResumo() {
 
   // KPIs
   const kpis = `
-    <div class="kpi"><div class="l">Salário Juliane</div><div class="v amber">${money(d.receitas?.salario_juliane?.atual)}</div><div class="s">mai/26</div></div>
+    <div class="kpi"><div class="l">Salário Juliane</div><div class="v amber">${money(d.receitas?.salario_juliane?.atual)}</div><div class="s">mai/26 ⚠️</div></div>
     <div class="kpi"><div class="l">Renda Hugo (líquida)</div><div class="v amber">${money(d.receitas?.hugo_taxi?.liquido)}</div><div class="s">táxi - combustível</div></div>
     <div class="kpi"><div class="l">Total Mensal</div><div class="v green">${money(d.receitas?.total_mensal)}</div></div>
     <div class="kpi"><div class="l">Saldo em Conta</div><div class="v green">${money(d.contas?.saldo_total)}</div><div class="s">08/06/2026</div></div>
@@ -285,26 +310,73 @@ function renderResumo() {
   `;
   document.getElementById('kpis-resumo').innerHTML = kpis;
 
-  const resumo = `
-    <div class="card">
-      <div class="ct" style="margin-bottom:14px;">👥 Pessoas</div>
-      <div class="row"><div class="rn">${d.pessoa?.juliane?.nome}<span class="rs">${d.pessoa?.juliane?.empresa} - ${d.pessoa?.juliane?.cargo}</span></div><div class="rv amber">${money(d.pessoa?.juliane?.salarioAtual)}</div></div>
-      <div class="row"><div class="rn">${d.pessoa?.hugo?.nome}<span class="rs">${d.pessoa?.hugo?.profissao}</span></div><div class="rv amber">${money(d.pessoa?.hugo?.rendaLiquida)}</div></div>
-    </div>
-
-    <div class="card">
-      <div class="ct" style="margin-bottom:14px;">💰 Contas Bancárias</div>
-      <div class="row"><div class="rn">${d.contas?.conta_principal?.banco} ${d.contas?.conta_principal?.tipo}</div><div class="rv green">${money(d.contas?.conta_principal?.saldo)}</div></div>
-    </div>
-
-    <div class="alert amber">
-      <div class="alert-title">⚠️ Situação Financeira</div>
-      <div class="alert-body">Entradas de ${money(d.receitas?.total_mensal)}/mês vs despesas de ${money(d.despesas?.total_mensal)}/mês geram um déficit de ${money(Math.abs(d.analise?.deficit_mensal))}/mês.</div>
+  // Black card evolution chart
+  const blackChart = `
+    <div class="chart-wrap">
+      <div class="chart-title">Fatura Black — Evolução Real</div>
+      <div class="chart-area">
+        <div class="bar-group">
+          <div class="bar bar-out" style="height:52px; width:100%; max-width:40px;"></div>
+          <div class="bar-label">jan/26</div>
+          <div class="bar-label" style="font-weight:700; color:#ff7070;">R$6.149</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar bar-out" style="height:78px; width:100%; max-width:40px;"></div>
+          <div class="bar-label">fev/26</div>
+          <div class="bar-label" style="font-weight:700; color:#ff7070;">R$9.199</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar bar-out" style="height:76px; width:100%; max-width:40px;"></div>
+          <div class="bar-label">mar/26</div>
+          <div class="bar-label" style="font-weight:700; color:#ff7070;">R$9.039</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar bar-out" style="height:60px; width:100%; max-width:40px; background:#EF9F27;"></div>
+          <div class="bar-label">abr/26</div>
+          <div class="bar-label" style="font-weight:700; color:#ffb347;">R$7.140</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar bar-in" style="height:46px; width:100%; max-width:40px;"></div>
+          <div class="bar-label">mai/26</div>
+          <div class="bar-label" style="font-weight:700; color:#6dbf6d;">R$5.692</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar" style="height:34px; width:100%; max-width:40px; background:#1a3a1a; border:1px dashed #6dbf6d;"></div>
+          <div class="bar-label">jul/26 est.</div>
+          <div class="bar-label" style="font-weight:700; color:#6dbf6d;">~R$4.346</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar" style="height:22px; width:100%; max-width:40px; background:#1a3a1a; border:1px dashed #6dbf6d;"></div>
+          <div class="bar-label">fev/27 est.</div>
+          <div class="bar-label" style="font-weight:700; color:#6dbf6d;">~R$2.700</div>
+        </div>
+      </div>
+      <div class="obs"><div class="dot green"></div><span>Queda de R$3.507 em 3 meses. Sem criar novos parcelamentos, fatura chega em ~R$2.700 em fev/27 automaticamente.</span></div>
     </div>
   `;
-  document.getElementById('resumo-content').innerHTML = resumo;
-}
 
+  // Timeline of relief
+  const timeline = `
+    <div class="card">
+      <div class="sec">Alívios automáticos chegando</div>
+      <div class="tl-item"><div class="tl-date green">jun/26</div><div class="tl-body"><div class="tl-desc">CRC termina · Airbnb termina · + 4 outros parcelamentos</div><div class="tl-save green">↓ Fatura cai ~R$1.514/mês</div></div></div>
+      <div class="tl-item"><div class="tl-date green">jul/26</div><div class="tl-body"><div class="tl-desc">Decathlon 1 e 2 terminam</div><div class="tl-save green">↓ +R$121 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">out/26</div><div class="tl-body"><div class="tl-desc">Rocha Auto Peças termina</div><div class="tl-save amber">↓ +R$151 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">nov/26</div><div class="tl-body"><div class="tl-desc">Magalu termina</div><div class="tl-save amber">↓ +R$300 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">dez/26</div><div class="tl-body"><div class="tl-desc">Livelo + Omega terminam · 13º + PLR chegam</div><div class="tl-save green">↓ +R$173 na fatura · +R$8.725 extras</div></div></div>
+      <div class="tl-item"><div class="tl-date red">jan/27</div><div class="tl-body"><div class="tl-desc">Kiwify termina — último grande parcelado</div><div class="tl-save green">↓ +R$615 · fatura vira rotina pura: ~R$2.700</div></div></div>
+    </div>
+  `;
+
+  // Action summary
+  const actionBox = `
+    <div class="alert amber">
+      <div class="alert-title">⚡ Regra de Ouro</div>
+      <div class="alert-body">Não criar novos parcelamentos e não tomar novos empréstimos. A fatura Black vai cair de R$5.692 para ~R$2.700 sozinha até fev/27. Cada novo parcelamento repõe o que está terminando e impede a queda.</div>
+    </div>
+  `;
+
+  document.getElementById('resumo-content').innerHTML = blackChart + timeline + actionBox;
 }
 
 function renderDividas() {
@@ -326,40 +398,42 @@ function renderDividas() {
       <div class="ch"><div class="ct">📌 Créditos Consignados (Folha)</div><div class="cv red">${money(d.dividas?.consignados_folha?.total)}</div></div>
       <div class="badge red">R$${d.dividas?.consignados_folha?.parcela_mensal}/mês descontado na folha</div>
       ${(d.dividas?.consignados_folha?.itens || []).map(i => `
-        <div class="row"><div class="rn"><strong>${i.nome}</strong><span class="rs">Termina ${i.termina} · ${i.parcelas_restantes} parcelas</span></div><div class="rv red">${money(i.saldo)}</div></div>
+        <div class="row"><div class="rn"><strong>${i.nome}</strong><span class="rs">R$${i.parcela_mensal}/mês · Termina ${i.termina}</span></div><div class="rv red">${money(i.saldo)}</div></div>
       `).join('')}
-      <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2e2e2e; font-size:11px; color:#ff7070;">⚠️ Margem consignável esgotada</div>
+      <div class="obs"><div class="dot red"></div><span>Margem consignável esgotada. Não é possível novo consignado.</span></div>
     </div>
 
     <div class="card">
       <div class="ch"><div class="ct">💳 Consignado Conta Corrente</div><div class="cv red">${money(d.dividas?.consignado_cc?.saldo)}</div></div>
       <div class="badge red">R$${d.dividas?.consignado_cc?.parcela_mensal}/mês · até ${d.dividas?.consignado_cc?.termina}</div>
       <div class="row"><div class="rn">Parcela ${d.dividas?.consignado_cc?.parcela_atual}/${d.dividas?.consignado_cc?.parcelas_totais}</div><div class="rv red">${money(d.dividas?.consignado_cc?.saldo)}</div></div>
-      <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2e2e2e; font-size:11px; color:#90dd90;">💡 Use 13º + PLR (dez/26) para abater</div>
+      <div class="obs"><div class="dot amber"></div><span>Use 13º + PLR (dez/26 ~R$8.725) para abater e liberar R$${d.dividas?.consignado_cc?.parcela_mensal}/mês antes de 2028.</span></div>
     </div>
 
     <div class="card">
       <div class="ch"><div class="ct">🏦 Empréstimo Cenira</div><div class="cv red">${money(d.dividas?.emprestimo_cenira?.saldo)}</div></div>
       <div class="badge red">R$${d.dividas?.emprestimo_cenira?.parcela_mensal}/mês · até ${d.dividas?.emprestimo_cenira?.termina}</div>
       <div class="row"><div class="rn">36 parcelas<span class="rs">Recebeu R$${d.dividas?.emprestimo_cenira?.valor_recebido} · Juros + IOF R$${d.dividas?.emprestimo_cenira?.juros_iof}</span></div><div class="rv red">${money(d.dividas?.emprestimo_cenira?.saldo)}</div></div>
+      <div class="obs"><div class="dot red"></div><span>Tomado para cobrir fatura do Black. Não tomar novos empréstimos.</span></div>
     </div>
 
     <div class="card">
       <div class="ch"><div class="ct">💳 Mastercard Black (****${d.dividas?.cartao_black?.ultimos_4})</div><div class="cv green">${money(d.dividas?.cartao_black?.fatura_atual)} ✅</div></div>
       <div class="badge green">Pago integralmente · nunca rotativo</div>
-      <div class="row"><div class="rn">Fatura mai/26</div><div class="rv green">Quitada</div></div>
+      <div class="row"><div class="rn">Fatura mai/26 · Caindo há 3 meses</div><div class="rv green">Quitada</div></div>
     </div>
 
     <div class="card">
       <div class="ch"><div class="ct">🛍️ Bradesco Amazon Platinum</div><div class="cv green">${money(d.dividas?.bradesco_amazon?.saldo)}</div></div>
-      <div class="badge green">Praticamente zerado</div>
-      <div class="row"><div class="rn">${d.dividas?.bradesco_amazon?.parcelas_pendentes} parcelas pendentes</div><div class="rv green">${money(d.dividas?.bradesco_amazon?.saldo)}</div></div>
+      <div class="badge green">Praticamente zerado · bem administrado</div>
+      <div class="row"><div class="rn">${d.dividas?.bradesco_amazon?.parcelas_pendentes} parcelas Amazon pendentes</div><div class="rv green">${money(d.dividas?.bradesco_amazon?.saldo)}</div></div>
     </div>
 
     <div class="card">
       <div class="ch"><div class="ct">💰 Empréstimo Mercado Pago</div><div class="cv red">6x ${money(d.dividas?.mercado_pago?.parcela_mensal)}</div></div>
       <div class="badge red">Vence dia ${d.dividas?.mercado_pago?.vencimento_dia} · até ${d.dividas?.mercado_pago?.ultima_parcela}</div>
       <div class="row"><div class="rn">Total ${money(d.dividas?.mercado_pago?.valor_total)} · mai/26</div><div class="rv red">6 parcelas</div></div>
+      <div class="obs"><div class="dot red"></div><span>Empréstimo para cobrir faturas do negócio.</span></div>
     </div>
   `;
   document.getElementById('dividas-content').innerHTML = dividas_html;
@@ -375,11 +449,52 @@ function renderDespesas() {
     <div class="kpi"><div class="l">Dívidas/Financiamentos</div><div class="v red">${money(d.despesas?.fixas?.dividas?.total)}</div></div>
     <div class="kpi"><div class="l">Casa (condomínio, etc)</div><div class="v red">${money(d.despesas?.fixas?.casa?.total)}</div></div>
     <div class="kpi"><div class="l">Outros Gastos</div><div class="v red">${money(d.despesas?.fixas?.outros?.total)}</div></div>
-    <div class="kpi"><div class="l">Fatura Black (estimada)</div><div class="v red">${money(d.despesas?.fixas?.fatura_black_estimada?.total)}</div></div>
+    <div class="kpi"><div class="l">Fatura Black (est.)</div><div class="v red">${money(d.despesas?.fixas?.fatura_black_estimada?.total)}</div></div>
   `;
   document.getElementById('kpis-despesas').innerHTML = kpis;
 
-  const despesas_html = `
+  // Progress bars
+  const progBars = `
+    <div class="sec">Onde vai o dinheiro todo mês</div>
+    <div class="prog-row"><div class="prog-label">Fatura Black</div><div class="prog-track"><div class="prog-fill" style="width:100%;background:#A32D2D;">R$${d.despesas?.fixas?.fatura_black_estimada?.total}</div></div><div class="prog-val red">R$${d.despesas?.fixas?.fatura_black_estimada?.total}</div></div>
+    <div class="prog-row"><div class="prog-label">Escola (2 filhos + van)</div><div class="prog-track"><div class="prog-fill" style="width:48%;background:#378ADD;">R$${d.despesas?.fixas?.escola_educacao?.total}</div></div><div class="prog-val blue">R$${d.despesas?.fixas?.escola_educacao?.total}</div></div>
+    <div class="prog-row"><div class="prog-label">Dívidas (consignados)</div><div class="prog-track"><div class="prog-fill" style="width:43%;background:#A32D2D;">R$${d.despesas?.fixas?.dividas?.total}</div></div><div class="prog-val red">R$${d.despesas?.fixas?.dividas?.total}</div></div>
+    <div class="prog-row"><div class="prog-label">Casa (condo+luz+agua)</div><div class="prog-track"><div class="prog-fill" style="width:26%;background:#639922;">R$${d.despesas?.fixas?.casa?.total}</div></div><div class="prog-val green">R$${d.despesas?.fixas?.casa?.total}</div></div>
+    <div class="prog-row"><div class="prog-label">Outros fixos</div><div class="prog-track"><div class="prog-fill" style="width:14%;background:#EF9F27;">R$${d.despesas?.fixas?.outros?.total}</div></div><div class="prog-val amber">R$${d.despesas?.fixas?.outros?.total}</div></div>
+  `;
+
+  // Expense categorization
+  const categorization = `
+    <div class="grid">
+      <div class="card">
+        <div class="ch"><div class="ct">✅ Necessidades — manter</div><div class="cv green">R$5.518</div></div>
+        <div class="badge green">Não cortar</div>
+        <div class="row"><span class="rn">Escola Valentina + Luca + Van</span><span class="rv green">R$2.275</span></div>
+        <div class="row"><span class="rn">Contas da casa (condomínio, água, luz, internet, celular)</span><span class="rv green">R$1.238</span></div>
+        <div class="row"><span class="rn">Ortodontia Luca + Almoço trabalho</span><span class="rv green">R$538</span></div>
+        <div class="row"><span class="rn">Seguro carro + Aluguel vaga carro</span><span class="rv green">R$486</span></div>
+        <div class="row"><span class="rn">Faxina + Varejão (essencial)</span><span class="rv green">R$201</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">⚠️ Avaliar — reduzir</div><div class="cv amber">R$1.208</div></div>
+        <div class="badge amber">Possível redução</div>
+        <div class="row"><span class="rn">APE Lockers (guardar móveis)<span class="rs">R$223 · vender móveis ou mais barato?</span></span><span class="rv amber">R$223</span></div>
+        <div class="row"><span class="rn">DAS MEI (negócio)<span class="rs">R$87 · revisar necessidade</span></span><span class="rv amber">R$87</span></div>
+        <div class="row"><span class="rn">Doações e transferências<span class="rs">R$905/mês · conversa necessária</span></span><span class="rv amber">R$905</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">🔴 Parar — eliminar agora</div><div class="cv red">~R$166</div></div>
+        <div class="badge red">Eliminar agora</div>
+        <div class="row"><span class="rn">Roupas (União Socorro)<span class="rs">3º mês seguido · parar imediatamente</span></span><span class="rv red">~R$166</span></div>
+        <div class="row"><span class="rn">Novos parcelamentos</span><span class="rv red">R$0 novos</span></div>
+        <div class="row"><span class="rn">Novos empréstimos</span><span class="rv red">R$0 novos</span></div>
+      </div>
+    </div>
+  `;
+
+  // Detailed expense cards
+  const expenses = `
+    <div class="sec">Despesas Fixas Detalhadas</div>
     <div class="card">
       <div class="ct" style="margin-bottom:10px;">🎓 Escola e Educação — ${money(d.despesas?.fixas?.escola_educacao?.total)}</div>
       ${(d.despesas?.fixas?.escola_educacao?.itens || []).map(i => `
@@ -412,10 +527,10 @@ function renderDespesas() {
       <div class="ct" style="margin-bottom:10px;">💳 Fatura Mastercard Black (Estimada) — ${money(d.despesas?.fixas?.fatura_black_estimada?.total)}</div>
       <div class="row"><div class="rn">Parcelamentos em andamento</div><div class="rv red">${money(d.despesas?.fixas?.fatura_black_estimada?.parcelamentos)}</div></div>
       <div class="row"><div class="rn">Rotina (compras novas)</div><div class="rv red">${money(d.despesas?.fixas?.fatura_black_estimada?.rotina)}</div></div>
-      <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2e2e2e; font-size:11px; color:#ffb347;">💡 Está caindo 3 meses seguidos</div>
     </div>
   `;
-  document.getElementById('despesas-content').innerHTML = despesas_html;
+
+  document.getElementById('despesas-content').innerHTML = progBars + categorization + expenses;
 }
 
 function renderFluxo() {
@@ -423,32 +538,79 @@ function renderFluxo() {
 
   const fluxo_html = `
     <div class="card">
-      <div class="ch"><div class="ct">💚 Entradas Mensais</div><div class="cv green">${money(d.receitas?.total_mensal)}</div></div>
+      <div class="ch"><div class="ct">💚 Entradas Mensais Reais</div><div class="cv green">${money(d.receitas?.total_mensal)}</div></div>
       <div class="badge green">Receitas confirmadas</div>
-      <div class="row"><div class="rn">Salário Juliane (líquido)</div><div class="rv green">${money(d.receitas?.salario_juliane?.atual)}</div></div>
-      <div class="row"><div class="rn">Hugo — táxi (líquido)</div><div class="rv amber">${money(d.receitas?.hugo_taxi?.liquido)}</div></div>
-      <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700;">TOTAL</div><div class="rv green" style="font-size:16px;">${money(d.receitas?.total_mensal)}</div></div>
+      <div class="row"><div class="rn">Salário Juliane (após INSS, IR, NEOS, saúde, econsignados)</div><div class="rv green">${money(d.receitas?.salario_juliane?.atual)}</div></div>
+      <div class="row"><div class="rn">Hugo — táxi (renda bruta)</div><div class="rv amber">${money(d.receitas?.hugo_taxi?.bruto)}</div></div>
+      <div class="row"><div class="rn">(-) Combustível táxi Hugo (custo operacional)</div><div class="rv red">-${money(d.receitas?.hugo_taxi?.combustivel)}</div></div>
+      <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700; color:#e0e0e0;">TOTAL ENTRADAS REAIS</div><div class="rv green" style="font-size:16px;">${money(d.receitas?.total_mensal)}</div></div>
     </div>
 
     <div class="card">
-      <div class="ch"><div class="ct">🔴 Saídas Mensais</div><div class="cv red">${money(d.despesas?.total_mensal)}</div></div>
-      <div class="badge red">Despesas fixas</div>
-      <div class="row"><div class="rn">Fatura Black (estimada)</div><div class="rv red">${money(d.despesas?.fixas?.fatura_black_estimada?.total)}</div></div>
-      <div class="row"><div class="rn">Escola + Educação</div><div class="rv red">${money(d.despesas?.fixas?.escola_educacao?.total)}</div></div>
-      <div class="row"><div class="rn">Dívidas (consignados)</div><div class="rv red">${money(d.despesas?.fixas?.dividas?.total)}</div></div>
-      <div class="row"><div class="rn">Casa (condomínio, etc)</div><div class="rv red">${money(d.despesas?.fixas?.casa?.total)}</div></div>
-      <div class="row"><div class="rn">Outros gastos</div><div class="rv red">${money(d.despesas?.fixas?.outros?.total)}</div></div>
-      <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700;">TOTAL</div><div class="rv red" style="font-size:16px;">${money(d.despesas?.total_mensal)}</div></div>
+      <div class="ch"><div class="ct">🔴 Saídas Fixas Mensais</div><div class="cv red">${money(d.despesas?.total_mensal)}</div></div>
+      <div class="badge red">Comprometimento atual</div>
+      <div class="sec">Categoria: Escola e Educação</div>
+      <div class="row"><div class="rn">Escola Valentina + Luca + Van escolar</div><div class="rv red">${money(d.despesas?.fixas?.escola_educacao?.total)}</div></div>
+      <div class="sec">Categoria: Dívidas</div>
+      <div class="row"><div class="rn">Consignado C/C + Empréstimo Cenira</div><div class="rv red">${money(d.despesas?.fixas?.dividas?.total)}</div></div>
+      <div class="sec">Categoria: Casa</div>
+      <div class="row"><div class="rn">Condomínio, CPFL, SANASA, Claro, Celular, IPTU</div><div class="rv red">${money(d.despesas?.fixas?.casa?.total)}</div></div>
+      <div class="sec">Categoria: Outros</div>
+      <div class="row"><div class="rn">APE Lockers, DAS MEI, Edileia (vaga), Nilza (faxina)</div><div class="rv red">${money(d.despesas?.fixas?.outros?.total)}</div></div>
+      <div class="sec">Categoria: Fatura Black (estimada)</div>
+      <div class="row"><div class="rn">Parcelamentos em andamento + Rotina</div><div class="rv red">${money(d.despesas?.fixas?.fatura_black_estimada?.total)}</div></div>
+      <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700; color:#e0e0e0;">TOTAL SAÍDAS FIXAS</div><div class="rv red" style="font-size:16px;">${money(d.despesas?.total_mensal)}</div></div>
+    </div>
+
+    <div class="ciclo">
+      <div class="ciclo-item">R$5.750 ENTRADA</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item">R$10.974 SAÍDA</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">R$5.224 DÉFICIT</div>
     </div>
 
     <div class="alert red">
       <div class="alert-title">🔴 Déficit Mensal: ${money(Math.abs(d.analise?.deficit_mensal))}</div>
-      <div class="alert-body">Cada mês há uma diferença de ${money(Math.abs(d.analise?.deficit_mensal))} que precisa ser coberta por poupança, empréstimos ou entradas extras.</div>
+      <div class="alert-body">Entradas R$${d.receitas?.total_mensal} vs saídas R$${d.despesas?.total_mensal}. O déficit de R$${Math.abs(d.analise?.deficit_mensal)} está sendo coberto por empréstimos e entradas irregulares.</div>
     </div>
 
     <div class="alert amber">
-      <div class="alert-title">⚠️ A boa notícia</div>
-      <div class="alert-body">O déficit melhora naturalmente: a fatura Black está caindo 3 meses seguidos e deve chegar a ~R$2.700 em fev/27 sem nenhuma ação extra.</div>
+      <div class="alert-title">⚠️ Nova parcela: Mercado Pago R$${d.dividas?.mercado_pago?.parcela_mensal}/mês até ${d.dividas?.mercado_pago?.ultima_parcela}</div>
+      <div class="alert-body">Empréstimo tomado em mai/26 para cobrir faturas do negócio. Vence dia ${d.dividas?.mercado_pago?.vencimento_dia} de cada mês. Alivia R$${d.dividas?.mercado_pago?.parcela_mensal}/mês a partir de dez/26. Até lá, aumenta o déficit mensal.</div>
+    </div>
+
+    <div class="alert green">
+      <div class="alert-title">✅ A Boa Notícia</div>
+      <div class="alert-body">Em fev/27, quando a fatura Black cair para ~R$2.700, o déficit vai a ~R$2.232 — ainda negativo, mas muito mais próximo do equilíbrio. Isso acontece automaticamente sem ação extra.</div>
+    </div>
+
+    <div class="scenario-grid">
+      <div class="sc positive">
+        <div class="sc-header">
+          <div class="sc-icon">📈</div>
+          <div class="sc-title">Fevereiro 2027 (Estimado)</div>
+          <div class="sc-subtitle">Quando os parcelamentos terminam</div>
+        </div>
+        <div class="sc-body">
+          <div class="row"><div class="rn">Entradas</div><div class="rv green">R$5.750</div></div>
+          <div class="row"><div class="rn">Saídas (Black mais baixa)</div><div class="rv amber">R$8.482</div></div>
+          <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700;">Déficit melhorado</div><div class="rv green">-R$2.232</div></div>
+        </div>
+      </div>
+      <div class="sc blue">
+        <div class="sc-header">
+          <div class="sc-icon">💰</div>
+          <div class="sc-title">Com 13º + PLR (Dezembro 2026)</div>
+          <div class="sc-subtitle">Abater consignado C/C</div>
+        </div>
+        <div class="sc-body">
+          <div class="row"><div class="rn">13º (estimado)</div><div class="rv blue">~R$4.033</div></div>
+          <div class="row"><div class="rn">PLR (estimado)</div><div class="rv blue">~R$4.692</div></div>
+          <div class="row"><div class="rn">Total disponível</div><div class="rv blue">~R$8.725</div></div>
+          <div class="row" style="border-top:1px solid #444; padding-top:10px; margin-top:10px;"><div class="rn" style="font-weight:700;">Libera permanentemente</div><div class="rv green">+R$1.403/mês</div></div>
+        </div>
+      </div>
     </div>
   `;
   document.getElementById('fluxo-content').innerHTML = fluxo_html;

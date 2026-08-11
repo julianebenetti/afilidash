@@ -1759,6 +1759,108 @@ function garimpoAtualizarBadgeAvaliacao(produto) {
   </div>
 </div>
 
+<div class="page" id="page-apontamentos">
+  <div class="toolbar">
+    <div style="font-size:13px;font-weight:600;">📝 Apontamentos</div>
+    <div class="toolbar-right" style="gap:8px;">
+      <button class="act-btn" onclick="apontarNovaEntrada()" style="border-color:#2563eb;color:#2563eb;">+ Novo Apontamento</button>
+      <button class="act-btn" onclick="renderApontamentosPendentes()" style="border-color:var(--green);color:var(--green);">🔄 Atualizar</button>
+    </div>
+  </div>
+
+  <!-- Formulário de Apontamento -->
+  <div class="section" id="apontamento-form-section" style="display:none;margin-bottom:20px;">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Novo Apontamento</div>
+        <div class="section-sub">Adicione informações manualmente ao dashboard</div>
+      </div>
+    </div>
+    <div style="padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+      <div class="cfg-field">
+        <label>Tipo de Movimento</label>
+        <select id="apoint-tipo" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--bg2);color:var(--text);font-family:var(--font);">
+          <option value="">— Selecione —</option>
+          <option value="entrada">💰 Entrada</option>
+          <option value="saida-fixa">📊 Saída Fixa</option>
+          <option value="saida-variavel">📈 Saída Variável</option>
+        </select>
+      </div>
+
+      <div class="cfg-field">
+        <label>Categoria</label>
+        <select id="apoint-categoria" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--bg2);color:var(--text);font-family:var(--font);">
+          <option value="">— Selecione —</option>
+          <option value="vendas">Vendas</option>
+          <option value="comissao">Comissão</option>
+          <option value="marketing">Marketing</option>
+          <option value="operacional">Operacional</option>
+          <option value="administrativo">Administrativo</option>
+          <option value="financeiro">Financeiro</option>
+          <option value="impostos">Impostos</option>
+          <option value="outros">Outros</option>
+        </select>
+      </div>
+
+      <div class="cfg-field">
+        <label>Valor (R$)</label>
+        <input type="number" id="apoint-valor" placeholder="0.00" step="0.01" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--bg2);color:var(--text);font-family:var(--font);">
+      </div>
+
+      <div class="cfg-field">
+        <label>Data</label>
+        <input type="date" id="apoint-data" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--bg2);color:var(--text);font-family:var(--font);">
+      </div>
+
+      <div class="cfg-field" style="grid-column:span 2;">
+        <label>Descrição</label>
+        <input type="text" id="apoint-descricao" placeholder="Resumo do apontamento" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--bg2);color:var(--text);font-family:var(--font);">
+      </div>
+
+      <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);cursor:pointer;font-size:13px;">
+          <input type="radio" name="apoint-acao" value="pendencia" checked style="cursor:pointer;"> Deixar como pendência
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);cursor:pointer;font-size:13px;">
+          <input type="radio" name="apoint-acao" value="aplicar" style="cursor:pointer;"> Aplicar agora
+        </label>
+      </div>
+
+      <div style="grid-column:1/-1;display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border);">
+        <button onclick="enviarApontamento()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);">✓ Enviar</button>
+        <button onclick="cancelarApontamento()" style="padding:8px 16px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);">✕ Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de Apontamentos Pendentes -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <div class="section-title">Apontamentos Pendentes</div>
+        <div class="section-sub" id="apoint-pending-count">Carregando...</div>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:calc(100vh - 220px);">
+      <table id="apoint-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Data</th>
+            <th>Tipo</th>
+            <th>Categoria</th>
+            <th style="text-align:right;">Valor</th>
+            <th style="text-align:left;">Descrição</th>
+            <th style="text-align:center;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="apoint-body">
+          <tr><td colspan="6" class="empty">Nenhum apontamento pendente</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-config">
 
   <!-- sticky header -->
@@ -8697,6 +8799,7 @@ function renderNavAbas() {
         ? "showPage('garimpo',this);if(window.garimpoLoadAll)garimpoLoadAll();"
         : `showPage('${a.id}',this)`,
     })),
+    { id:'apontamentos', label:'Apontamentos', icon:'📝', onclick:"showPage('apontamentos',this);renderApontamentosPendentes()" },
   ];
   cont.innerHTML = pages.map(p => `<button class="nav-tab" data-nav-page="${esc(p.id)}" onclick="${p.onclick}"><span class="nav-ico">${esc(p.icon)}</span>${esc(p.label)}</button>`).join('');
   const ativa = (document.querySelector('.page.active')?.id || '').replace(/^page-/, '');
@@ -17114,6 +17217,179 @@ function salvarLancamentos() {
   });
 
   render();
+}
+
+// ═══════════════════════════════════════════
+// APONTAMENTOS (Manual Entry)
+// ═══════════════════════════════════════════
+let _apontamentosBuffer = [];
+
+function apontarNovaEntrada() {
+  const form = document.getElementById('apontamento-form-section');
+  if (form) {
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') {
+      document.getElementById('apoint-data')?.focus();
+      // Define data atual como padrão
+      const hoje = new Date().toISOString().split('T')[0];
+      document.getElementById('apoint-data').value = hoje;
+    }
+  }
+}
+
+function cancelarApontamento() {
+  const form = document.getElementById('apontamento-form-section');
+  if (form) {
+    form.style.display = 'none';
+    document.getElementById('apoint-tipo').value = '';
+    document.getElementById('apoint-categoria').value = '';
+    document.getElementById('apoint-valor').value = '';
+    document.getElementById('apoint-descricao').value = '';
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('apoint-data').value = hoje;
+    document.querySelector('input[name="apoint-acao"][value="pendencia"]').checked = true;
+  }
+}
+
+async function enviarApontamento() {
+  const tipo = document.getElementById('apoint-tipo')?.value;
+  const categoria = document.getElementById('apoint-categoria')?.value;
+  const valor = parseFloat(document.getElementById('apoint-valor')?.value || 0);
+  const data = document.getElementById('apoint-data')?.value;
+  const descricao = document.getElementById('apoint-descricao')?.value || '';
+  const acao = document.querySelector('input[name="apoint-acao"]:checked')?.value || 'pendencia';
+
+  if (!tipo || !categoria || !valor || !data) {
+    toast('Preencha Tipo, Categoria, Valor e Data', 'warn');
+    return;
+  }
+
+  const apontamento = {
+    id: 'apoint_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    tipo,
+    categoria,
+    valor,
+    data,
+    descricao,
+    status: acao === 'aplicar' ? 'aplicado' : 'pendente',
+    criado_em: new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch('/api/apontamentos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apontamento),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.erro || 'Erro ao enviar apontamento');
+
+    if (acao === 'aplicar') {
+      toast('✓ Apontamento aplicado com sucesso', 'success');
+      // Adiciona ao DADOS se houver estrutura
+      if (Array.isArray(DADOS)) {
+        _marcarDADOSAlterados();
+      }
+    } else {
+      toast('✓ Apontamento deixado como pendência', 'success');
+      _apontamentosBuffer.push({ ...apontamento, pendente: true });
+    }
+
+    cancelarApontamento();
+    renderApontamentosPendentes();
+  } catch (e) {
+    console.error('Erro ao enviar apontamento:', e.message);
+    toast('⚠️ Erro: ' + e.message, 'warn');
+  }
+}
+
+async function renderApontamentosPendentes() {
+  try {
+    const res = await fetch('/api/apontamentos');
+    const json = await res.json();
+
+    if (!res.ok || json.erro) {
+      console.warn('Falha ao carregar apontamentos:', json.erro);
+      _apontamentosBuffer = [];
+    } else {
+      _apontamentosBuffer = json.dados || [];
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar apontamentos:', e.message);
+    _apontamentosBuffer = [];
+  }
+
+  const body = document.getElementById('apoint-body');
+  const count = document.getElementById('apoint-pending-count');
+
+  if (!body) return;
+
+  const pendentes = _apontamentosBuffer.filter(a => a.status === 'pendente');
+
+  if (count) {
+    count.textContent = pendentes.length ? `${pendentes.length} pendente${pendentes.length !== 1 ? 's' : ''}` : 'Nenhum pendente';
+  }
+
+  if (!pendentes.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum apontamento pendente</td></tr>';
+    return;
+  }
+
+  body.innerHTML = pendentes.map(a => {
+    const data = new Date(a.data).toLocaleDateString('pt-BR');
+    const tipoLabel = { 'entrada': '💰 Entrada', 'saida-fixa': '📊 Saída Fixa', 'saida-variavel': '📈 Saída Variável' }[a.tipo] || a.tipo;
+    return `<tr class="data-row">
+      <td style="text-align:left;">${data}</td>
+      <td>${tipoLabel}</td>
+      <td>${a.categoria}</td>
+      <td style="text-align:right;">R$ ${a.valor.toFixed(2).replace('.', ',')}</td>
+      <td style="text-align:left;">${a.descricao || '—'}</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button onclick="confirmarApontamento('${a.id}')" title="Aplicar" style="padding:3px 8px;font-size:11px;border:1px solid var(--green-bdr);border-radius:var(--r);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:var(--font);margin-right:4px;">✓</button>
+        <button onclick="excluirApontamento('${a.id}')" title="Descartar" style="padding:3px 8px;font-size:11px;border:1px solid var(--red-bdr);border-radius:var(--r);background:var(--red-bg);color:var(--red);cursor:pointer;font-family:var(--font);">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function confirmarApontamento(id) {
+  try {
+    const res = await fetch(`/api/apontamentos/${id}/confirmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.erro || 'Erro ao confirmar');
+
+    toast('✓ Apontamento aplicado com sucesso', 'success');
+    if (Array.isArray(DADOS)) _marcarDADOSAlterados();
+    renderApontamentosPendentes();
+  } catch (e) {
+    console.error('Erro ao confirmar apontamento:', e.message);
+    toast('⚠️ Erro: ' + e.message, 'warn');
+  }
+}
+
+async function excluirApontamento(id) {
+  if (!confirm('Descartar este apontamento?')) return;
+
+  try {
+    const res = await fetch(`/api/apontamentos/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.erro || 'Erro ao excluir');
+
+    toast('✓ Apontamento descartado', 'success');
+    renderApontamentosPendentes();
+  } catch (e) {
+    console.error('Erro ao excluir apontamento:', e.message);
+    toast('⚠️ Erro: ' + e.message, 'warn');
+  }
 }
 
 // ═══════════════════════════════════════════

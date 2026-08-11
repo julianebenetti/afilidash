@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importação Automática de Dados - Financeiro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 800px;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #f8f9ff;
+        }
+
+        .upload-zone.hover {
+            background-color: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        .upload-zone.active {
+            background-color: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            color: #999;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            background: #f5f5f5;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 20px;
+        }
+
+        .file-name {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .file-size {
+            color: #999;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .remove-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .remove-btn:hover {
+            background: #ee5a52;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #1565c0;
+        }
+
+        .error-box {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #c62828;
+        }
+
+        .success-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #2e7d32;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .result-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-item {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .result-text {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .supported-files {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .file-type {
+            text-align: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .file-type-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: #e0e0e0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: #999;
+            margin: 0 auto 10px;
+            transition: all 0.3s ease;
+        }
+
+        .step.active .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .step.completed .step-number {
+            background: #4caf50;
+            color: white;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .step.active .step-label {
+            color: #667eea;
+        }
+
+        .tab-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .tab-container.active {
+            display: block;
+        }
+
+        .confirmation-area {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .question {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .question-text {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .option {
+            margin: 8px 0;
+        }
+
+        .option input[type="radio"],
+        .option input[type="text"] {
+            margin-right: 8px;
+        }
+
+        .option label {
+            cursor: pointer;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active" id="step-1">
+                <div class="step-number">1</div>
+                <div class="step-label">Upload</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-number">2</div>
+                <div class="step-label">Extração</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-number">3</div>
+                <div class="step-label">Confirmação</div>
+            </div>
+            <div class="step" id="step-4">
+                <div class="step-number">4</div>
+                <div class="step-label">Aplicação</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Importação Automática de Dados</h1>
+            <p>Envie seus documentos e o sistema fará o resto</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section" id="upload-section">
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Clique ou arraste arquivos aqui</div>
+                <div class="upload-subtext">PDF, XLS, PNG, JPG - até 50MB cada</div>
+            </div>
+
+            <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.png,.jpg,.jpeg,.gif">
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="info-box" id="infoBox" style="display: none;"></div>
+
+            <div class="supported-files">
+                <div class="file-type">
+                    <div class="file-type-icon">📄</div>
+                    <strong>PDF</strong><br>
+                    Extratos, Faturas
+                </div>
+                <div class="file-type">
+                    <div class="file-type-icon">📊</div>
+                    <strong>XLS/XLSX</strong><br>
+                    Planilhas
+                </div>
+                <div class="file-type">
+                    <div class="file-type-icon">📸</div>
+                    <strong>PNG/JPG</strong><br>
+                    Screenshots
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="uploadBtn" disabled>
+                    ✈️ Enviar Arquivos
+                </button>
+                <button class="btn btn-secondary" id="clearBtn">
+                    🗑️ Limpar
+                </button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processando arquivos...</p>
+            </div>
+
+            <div class="error-box" id="errorBox" style="display: none;"></div>
+            <div class="success-box" id="successBox" style="display: none;"></div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="result-section" id="resultSection">
+            <h2 style="margin-bottom: 20px;">📋 Resultados da Extração</h2>
+            <div id="resultContent"></div>
+
+            <div class="confirmation-area" id="confirmationArea" style="display: none;">
+                <h3 style="margin-bottom: 15px;">❓ Dúvidas Encontradas</h3>
+                <div id="questionsContainer"></div>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="confirmBtn">
+                        ✅ Confirmar Respostas
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Changes Preview Section -->
+        <div class="result-section" id="changesSection" style="display: none;">
+            <h2 style="margin-bottom: 20px;">📋 Mudanças Propostas</h2>
+            <div id="changesContent"></div>
+            <div class="button-group">
+                <button class="btn btn-primary" id="applyBtn">
+                    ✅ Aplicar Mudanças
+                </button>
+                <button class="btn btn-secondary" id="cancelBtn">
+                    ❌ Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- Final Result Section -->
+        <div class="result-section" id="finalSection" style="display: none;">
+            <h2 style="margin-bottom: 20px;">✅ Mudanças Aplicadas</h2>
+            <div id="finalContent"></div>
+            <div class="button-group">
+                <button class="btn btn-primary" id="downloadBtn">
+                    📥 Download do Arquivo
+                </button>
+                <button class="btn btn-secondary" id="restartBtn">
+                    🔄 Nova Importação
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        let currentSessionId = null;
+
+        // Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const errorBox = document.getElementById('errorBox');
+        const successBox = document.getElementById('successBox');
+        const infoBox = document.getElementById('infoBox');
+
+        // Upload Zone Events
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('hover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('hover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('hover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // File Input Change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // Handle Files
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            updateFileList();
+            uploadBtn.disabled = selectedFiles.length === 0;
+        }
+
+        // Update File List Display
+        function updateFileList() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div class="file-item-name">
+                        <div class="file-icon">${getFileIcon(file.name)}</div>
+                        <div>
+                            <div class="file-name">${file.name}</div>
+                            <span class="file-size">${(file.size / 1024).toFixed(2)} KB</span>
+                        </div>
+                    </div>
+                    <button class="remove-btn" onclick="removeFile(${index})">Remover</button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        // Get File Icon
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                pdf: '📄',
+                xlsx: '📊',
+                xls: '📊',
+                png: '🖼️',
+                jpg: '🖼️',
+                jpeg: '🖼️',
+                gif: '🖼️'
+            };
+            return icons[ext] || '📁';
+        }
+
+        // Remove File
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            uploadBtn.disabled = selectedFiles.length === 0;
+        }
+
+        // Clear All
+        clearBtn.addEventListener('click', () => {
+            selectedFiles = [];
+            updateFileList();
+            fileInput.value = '';
+            errorBox.style.display = 'none';
+            successBox.style.display = 'none';
+            uploadBtn.disabled = true;
+        });
+
+        // Upload Files
+        uploadBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+
+            loading.style.display = 'block';
+            errorBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    currentSessionId = data.sessionId;
+                    handleUploadSuccess(data);
+                }
+            } catch (error) {
+                showError('Erro ao enviar arquivos: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        // Handle Upload Success
+        function handleUploadSuccess(data) {
+            updateStep(2);
+            updateStep(3);
+
+            const resultSection = document.getElementById('resultSection');
+            const resultContent = document.getElementById('resultContent');
+
+            let html = `
+                <div class="success-box">
+                    ${data.resposta_usuario.replace(/\n/g, '<br>')}
+                </div>
+            `;
+
+            if (data.total_duvidas > 0) {
+                html += `
+                    <div class="confirmation-area" id="confirmationArea">
+                        <h3 style="margin-bottom: 15px;">❓ Dúvidas Encontradas</h3>
+                        <div id="questionsContainer">
+                            <p>Carregando perguntas...</p>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" id="confirmBtn">
+                                ✅ Confirmar Respostas
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultContent.innerHTML = html;
+            resultSection.style.display = 'block';
+
+            // Show info box
+            infoBox.textContent = `✅ Arquivos processados com sucesso! ${data.total_duvidas > 0 ? 'Aguardando suas respostas...' : 'Pronto para aplicar.'}`;
+            infoBox.style.display = 'block';
+        }
+
+        // Show Error
+        function showError(message) {
+            errorBox.textContent = '❌ ' + message;
+            errorBox.style.display = 'block';
+        }
+
+        // Update Step Indicator
+        function updateStep(stepNum) {
+            document.getElementById(`step-${stepNum}`).classList.add('active', 'completed');
+        }
+
+        // Restart
+        document.getElementById('restartBtn')?.addEventListener('click', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>

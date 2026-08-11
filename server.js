@@ -9,6 +9,7 @@ app.use(express.static('public'));
 
 const dataDir = path.join(__dirname, 'data');
 const apontamentosFile = path.join(dataDir, 'apontamentos.json');
+const financeiroFile = path.join(dataDir, 'financeiro.json');
 
 // Criar diretório se não existir
 if (!fs.existsSync(dataDir)) {
@@ -99,6 +100,45 @@ app.delete('/api/apontamentos/:id', (req, res) => {
     fs.writeFileSync(apontamentosFile, JSON.stringify(data_atual, null, 2));
 
     res.json({ ok: true, removido: removido[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
+// GET - Dados financeiros completos
+app.get('/api/dados', (req, res) => {
+  try {
+    if (!fs.existsSync(financeiroFile)) {
+      return res.status(404).json({ ok: false, erro: 'Arquivo de dados financeiros não encontrado' });
+    }
+    const dados = JSON.parse(fs.readFileSync(financeiroFile, 'utf8'));
+    res.json(dados);
+  } catch (err) {
+    res.status(500).json({ ok: false, erro: err.message });
+  }
+});
+
+// POST - Atualizar dados financeiros
+app.post('/api/dados', (req, res) => {
+  try {
+    const novosDados = req.body;
+    if (!novosDados || typeof novosDados !== 'object') {
+      return res.status(400).json({ ok: false, erro: 'Dados inválidos' });
+    }
+
+    // Fazer deep merge com dados existentes
+    let dados = {};
+    if (fs.existsSync(financeiroFile)) {
+      dados = JSON.parse(fs.readFileSync(financeiroFile, 'utf8'));
+    }
+
+    // Merge simples (você pode implementar deep merge se necessário)
+    const merged = { ...dados, ...novosDados };
+    merged.metadata = merged.metadata || {};
+    merged.metadata.data_atualizacao = new Date().toISOString().split('T')[0];
+
+    fs.writeFileSync(financeiroFile, JSON.stringify(merged, null, 2));
+    res.json({ ok: true, dados: merged });
   } catch (err) {
     res.status(500).json({ ok: false, erro: err.message });
   }

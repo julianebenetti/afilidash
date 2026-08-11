@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico Financeiro — Juliane 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #111; font-family: -apple-system, 'Segoe UI', sans-serif; padding: 16px; }
+.wrap { max-width: 940px; margin: 0 auto; }
+.main-header { margin-bottom: 18px; }
+.main-header h1 { font-size: 18px; font-weight: 700; color: #e0e0e0; margin-bottom: 2px; }
+.main-header .sub { font-size: 11px; color: #888; }
+
+/* NÍVEL 1 — seções */
+.section-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.section-tab { font-size: 12px; padding: 8px 18px; border-radius: 8px; border: 1px solid #444; background: #1a1a1a; cursor: pointer; color: #888; font-weight: 600; }
+.section-tab.active { background: #e0e0e0; color: #1a1a1a; border-color: #e0e0e0; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* NÍVEL 2 — sub-abas */
+.tab-bar { display: flex; gap: 5px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab { font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 1px solid #383838; background: transparent; cursor: pointer; color: #888; }
+.tab.active { background: #333; color: #e0e0e0; border-color: #555; font-weight: 600; }
+.tc { display: none; }
+.tc.active { display: block; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin-bottom:14px; }
+.kpi { background:#222; border-radius:10px; padding:13px; }
+.kpi .l { font-size:10px; color:#888; margin-bottom:5px; line-height:1.4; }
+.kpi .v { font-size:18px; font-weight:700; }
+.kpi .s { font-size:10px; color:#666; margin-top:3px; }
+
+/* Cards */
+.card { background:#222; border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+.ch { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:7px; }
+.ct { font-size:13px; font-weight:600; color:#e8e8e8; }
+.cv { font-size:15px; font-weight:700; }
+.badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; margin-bottom:9px; }
+.bg { background:#1a3a1a;color:#6dbf6d; } .br { background:#6b1a1a;color:#ff7070; }
+.ba { background:#5a3d00;color:#ffb347; } .bb { background:#1a2a4a;color:#7ab8f5; }
+.bgr { background:#2a2a2a;color:#aaa; }
+.row { display:flex; justify-content:space-between; align-items:flex-start; padding:7px 0; border-bottom:0.5px solid #2e2e2e; font-size:12px; gap:8px; }
+.row:last-child { border-bottom:none; }
+.rn { color:#bbb; flex:1; line-height:1.5; }
+.rs { font-size:10px; color:#666; display:block; margin-top:1px; }
+.rv { font-weight:600; white-space:nowrap; }
+.red{color:#ff7070;} .amber{color:#ffb347;} .green{color:#6dbf6d;} .blue{color:#7ab8f5;} .gray{color:#888;}
+.obs { margin-top:10px; padding-top:10px; border-top:1px solid #2e2e2e; font-size:11px; color:#999; line-height:1.6; display:flex; gap:7px; }
+.dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.sec { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.06em; margin:1.2rem 0 0.7rem; }
+.divr { border:none; border-top:0.5px solid #2e2e2e; margin:6px 0; }
+
+/* Alert boxes */
+.abox { border-radius:10px; padding:13px 15px; margin-bottom:10px; }
+.abox.red { background:#2a0f0f; border:1px solid #6b1a1a; }
+.abox.red .at { font-size:13px; font-weight:700; color:#ff7070; margin-bottom:4px; }
+.abox.red .ab { font-size:12px; color:#cc8080; line-height:1.7; }
+.abox.amber { background:#2a1e00; border:1px solid #5a3d00; }
+.abox.amber .at { font-size:13px; font-weight:700; color:#ffb347; margin-bottom:4px; }
+.abox.amber .ab { font-size:12px; color:#cc9966; line-height:1.7; }
+.abox.green { background:#0f2a0f; border:1px solid #1a4a1a; }
+.abox.green .at { font-size:13px; font-weight:700; color:#6dbf6d; margin-bottom:4px; }
+.abox.green .ab { font-size:12px; color:#80cc80; line-height:1.7; }
+
+.total-bar { background:#1a1a1a; border-radius:8px; padding:12px 16px; margin-top:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.ti .tl { font-size:10px; color:#888; margin-bottom:3px; }
+.ti .tv { font-size:14px; font-weight:700; }
+
+/* Grid */
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+
+/* Progress bars */
+.prog-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+.prog-label { width:150px; font-size:11px; color:#bbb; text-align:right; flex-shrink:0; }
+.prog-track { flex:1; background:#2e2e2e; border-radius:3px; height:20px; overflow:hidden; }
+.prog-fill { height:100%; border-radius:3px; display:flex; align-items:center; padding-left:6px; font-size:10px; font-weight:700; color:white; white-space:nowrap; }
+.prog-val { width:70px; font-size:11px; font-weight:600; flex-shrink:0; }
+
+/* Timeline */
+.tl-item { display:flex; gap:14px; padding:10px 0; border-bottom:0.5px solid #2e2e2e; }
+.tl-item:last-child { border-bottom:none; }
+.tl-date { min-width:54px; font-size:11px; font-weight:700; }
+.tl-body { flex:1; }
+.tl-desc { font-size:11px; color:#bbb; line-height:1.7; }
+.tl-save { font-size:12px; font-weight:700; margin-top:3px; }
+
+/* Month cards (fluxo) */
+.mc { background:#222; border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.mh { display:flex; justify-content:space-between; align-items:center; padding:13px 15px; cursor:pointer; }
+.mh:hover { background:#2a2a2a; }
+.mh-left .mn { font-size:13px; font-weight:700; color:#e0e0e0; }
+.mh-left .ms { font-size:10px; color:#888; margin-top:2px; }
+.mh-right { text-align:right; }
+.mh-saldo { font-size:14px; font-weight:700; }
+.mh-type { font-size:9px; margin-top:2px; }
+.chev { color:#666; font-size:10px; margin-left:10px; transition:transform 0.2s; }
+.chev.open { transform:rotate(180deg); }
+.mb { display:none; padding:0 15px 13px; border-top:0.5px solid #2e2e2e; }
+.mb.open { display:block; }
+.mb-sec { font-size:10px; font-weight:700; color:#888; text-transform:uppercase; margin:10px 0 5px; }
+.mb-total { display:flex; justify-content:space-between; padding:8px 0 4px; margin-top:6px; border-top:1px solid #333; font-size:12px; font-weight:700; }
+.month-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; }
+
+/* Tags */
+.tag { display:inline-block; font-size:9px; padding:1px 5px; border-radius:6px; margin-right:4px; font-weight:700; }
+.tnew { background:#6b1a1a; color:#ff7070; }
+.tfix { background:#1a2a4a; color:#7ab8f5; }
+.tsch { background:#5a3d00; color:#ffb347; }
+.tend { background:#1a3a1a; color:#6dbf6d; }
+.talert { background:#4a2000; color:#ff9240; }
+
+/* Scenario cards */
+.scenario-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+.sc { border-radius:12px; overflow:hidden; }
+.sc-header { padding:14px 16px; }
+.sc-icon { font-size:20px; margin-bottom:6px; }
+.sc-title { font-size:14px; font-weight:700; color:#e0e0e0; margin-bottom:2px; }
+.sc-subtitle { font-size:11px; opacity:0.8; }
+.sc-body { background:#1e1e1e; padding:14px 16px; }
+.sc.danger .sc-header { background:#2a0a0a; border:1px solid #6b1a1a; border-bottom:none; }
+.sc.danger .sc-subtitle { color:#ff9090; }
+.sc.danger .sc-body { border:1px solid #6b1a1a; border-top:none; border-radius:0 0 12px 12px; }
+.sc.warning .sc-header { background:#2a1a00; border:1px solid #6b4400; border-bottom:none; }
+.sc.warning .sc-subtitle { color:#ffbb77; }
+.sc.warning .sc-body { border:1px solid #6b4400; border-top:none; border-radius:0 0 12px 12px; }
+.sc.positive .sc-header { background:#0a2a0a; border:1px solid #1a5a1a; border-bottom:none; }
+.sc.positive .sc-subtitle { color:#90dd90; }
+.sc.positive .sc-body { border:1px solid #1a5a1a; border-top:none; border-radius:0 0 12px 12px; }
+.sc.blue-sc .sc-header { background:#0a1a2a; border:1px solid #1a3a6a; border-bottom:none; }
+.sc.blue-sc .sc-subtitle { color:#90c0ff; }
+.sc.blue-sc .sc-body { border:1px solid #1a3a6a; border-top:none; border-radius:0 0 12px 12px; }
+.sc.base .sc-header { background:#1a1a1a; border:1px solid #3a3a3a; border-bottom:none; }
+.sc.base .sc-subtitle { color:#aaa; }
+.sc.base .sc-body { border:1px solid #3a3a3a; border-top:none; border-radius:0 0 12px 12px; }
+.result-box { border-radius:8px; padding:10px 12px; margin-top:10px; }
+.result-box .rl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+.result-box .rv2 { font-size:20px; font-weight:700; }
+.result-box .rs { font-size:10px; margin-top:3px; opacity:0.8; }
+.result-box.red-box { background:#2a0f0f; } .result-box.red-box .rl,.result-box.red-box .rv2 { color:#ff7070; } .result-box.red-box .rs { color:#cc8080; }
+.result-box.amber-box { background:#2a1800; } .result-box.amber-box .rl,.result-box.amber-box .rv2 { color:#ffb347; } .result-box.amber-box .rs { color:#cc9966; }
+.result-box.green-box { background:#0f2a0f; } .result-box.green-box .rl,.result-box.green-box .rv2 { color:#6dbf6d; } .result-box.green-box .rs { color:#80cc80; }
+.result-box.gray-box { background:#1a1a1a; } .result-box.gray-box .rl,.result-box.gray-box .rv2 { color:#aaa; } .result-box.gray-box .rs { color:#666; }
+.warn-item { display:flex; gap:8px; font-size:11px; color:#cc8080; padding:4px 0; line-height:1.5; }
+.good-item { display:flex; gap:8px; font-size:11px; color:#80cc80; padding:4px 0; line-height:1.5; }
+.neutral-item { display:flex; gap:8px; font-size:11px; color:#cc9966; padding:4px 0; line-height:1.5; }
+.verdict { border-radius:8px; padding:10px 12px; margin-top:10px; font-size:11px; line-height:1.6; font-weight:600; }
+.verdict.rec { background:#0f2a0f; color:#6dbf6d; border:1px solid #1a4a1a; }
+.verdict.nrec { background:#2a0f0f; color:#ff7070; border:1px solid #6b1a1a; }
+.verdict.maybe { background:#2a1e00; color:#ffb347; border:1px solid #5a3d00; }
+
+/* Ciclo visual */
+.ciclo { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:14px 0; }
+.ciclo-item { background:#222; border-radius:8px; padding:8px 12px; font-size:11px; color:#bbb; text-align:center; min-width:90px; }
+.ciclo-item.red { border:1px solid #6b1a1a; color:#ff7070; }
+.ciclo-arrow { color:#666; font-size:14px; }
+
+/* Compare bars */
+.compare-bar { margin:8px 0; }
+.cb-label { font-size:10px; color:#888; margin-bottom:3px; display:flex; justify-content:space-between; }
+.cb-track { height:20px; background:#1a1a1a; border-radius:4px; overflow:hidden; }
+.cb-fill { height:100%; border-radius:4px; display:flex; align-items:center; padding-left:8px; font-size:10px; font-weight:700; color:white; }
+
+/* Chart */
+.chart-wrap { background:#1a1a1a; border-radius:12px; padding:16px; margin-bottom:14px; }
+.chart-title { font-size:12px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:14px; }
+.chart-area { display:flex; gap:4px; align-items:flex-end; height:140px; }
+.bar-group { flex:1; display:flex; gap:2px; align-items:flex-end; position:relative; flex-direction:column; align-items:center; }
+.bar-cols { display:flex; gap:2px; align-items:flex-end; width:100%; }
+.bar { border-radius:3px 3px 0 0; flex:1; display:flex; align-items:flex-start; justify-content:center; padding-top:2px; font-size:8px; font-weight:700; color:white; min-height:4px; }
+.bar-in { background:#2a5a2a; }
+.bar-out { background:#5a1a1a; }
+.bar-label { font-size:9px; color:#888; margin-top:22px; white-space:nowrap; }
+.bar-saldo { font-size:9px; font-weight:700; margin-top:2px; }
+.chart-legend { display:flex; gap:16px; margin-top:8px; }
+.leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:#888; }
+.leg-dot { width:10px; height:10px; border-radius:2px; }
+
+/* Bar wrap (small) */
+.bar-wrap { height:4px; background:#383838; border-radius:2px; margin-bottom:10px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="main-header">
+  <h1>Diagnóstico financeiro pessoal — Juliane & Hugo · 2026</h1>
+  <div class="sub">Atualizado 08/06/2026 · Saldo conta R$5.587 · Cartões do negócio excluídos · Combustível Hugo = custo do táxi</div>
+</div>
+
+<div class="section-tabs">
+  <button class="section-tab active" onclick="showSection('diagnostico')">📋 Diagnóstico</button>
+  <button class="section-tab" onclick="showSection('fluxo')">💸 Fluxo de caixa</button>
+  <button class="section-tab" onclick="showSection('cenarios')">🔀 E se...? Cenários</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SEÇÃO 1: DIAGNÓSTICO -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="section-diagnostico" class="section active">
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Salário líquido Juliane</div><div class="v amber">R$3.105 ⚠️</div><div class="s">mai/26 — holerite pendente</div></div>
+    <div class="kpi"><div class="l">Hugo líquido (táxi - combustível)</div><div class="v amber">R$2.350</div></div>
+    <div class="kpi"><div class="l">Saldo conta hoje</div><div class="v green">R$5.587 ✅</div><div class="s">08/06/2026</div></div>
+    <div class="kpi"><div class="l">Dívida pessoal total</div><div class="v red">R$109.838</div></div>
+    <div class="kpi"><div class="l">Fatura Black mai/26</div><div class="v green">R$5.692 ✅ paga</div></div>
+    <div class="kpi"><div class="l">Mercado Pago (novo)</div><div class="v red">6x R$1.943</div><div class="s">vence dia 16 · até nov/26</div></div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('diagnostico','dividas')">🏦 Dívidas</button>
+    <button class="tab" onclick="showTab('diagnostico','fluxo-diag')">💸 Fluxo mensal</button>
+    <button class="tab" onclick="showTab('diagnostico','gastos')">📊 Gastos</button>
+    <button class="tab" onclick="showTab('diagnostico','progresso')">📈 Progresso</button>
+    <button class="tab" onclick="showTab('diagnostico','plano')">✂️ Plano</button>
+  </div>
+
+  <!-- DÍVIDAS -->
+  <div id="diagnostico-dividas" class="tc active">
+    <div class="grid">
+      <div class="card">
+        <div class="ch"><div class="ct">Créditos consignados (folha)</div><div class="cv red">R$52.084</div></div>
+        <div class="badge br">R$1.564/mês descontado direto na folha</div>
+        <div class="row"><div class="rn">Econsignado 1 (dez/25)<span class="rs">R$676/mês · termina nov/2032</span></div><div class="rv red">R$28.152</div></div>
+        <div class="row"><div class="rn">Econsignado 2 (nov/25)<span class="rs">R$634/mês · termina out/2028</span></div><div class="rv red">R$14.762</div></div>
+        <div class="row"><div class="rn">Econsignado 3 (mar/26)<span class="rs">R$254/mês · termina fev/2033</span></div><div class="rv red">R$9.170</div></div>
+        <div class="obs"><div class="dot" style="background:#ff7070;"></div><span>Margem consignável esgotada. Não é possível novo consignado.</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Consignado conta corrente</div><div class="cv red">R$28.743</div></div>
+        <div class="badge br">R$1.403/mês · débito automático · até jun/2028</div>
+        <div class="row"><div class="rn">Parcela 32/60 · contratado jul/2023</div><div class="rv red">R$28.743</div></div>
+        <div class="obs"><div class="dot" style="background:#ffb347;"></div><span>Use 13º + PLR (dez/26 ~R$8.725) para abater. Libera R$1.403/mês antes de 2028.</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Empréstimo Cenira</div><div class="cv red">R$23.252</div></div>
+        <div class="badge br">R$646/mês · 1ª parcela 25/06/26 · até jun/2029</div>
+        <div class="row"><div class="rn">36 parcelas · recebeu R$10.000<span class="rs">R$13.252 de juros e IOF — custo alto</span></div><div class="rv red">R$23.252</div></div>
+        <div class="obs"><div class="dot" style="background:#ff7070;"></div><span>Tomado para cobrir fatura do Black. Não tomar novos empréstimos.</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Mastercard Black (final 4846)</div><div class="cv green">R$5.692 ↓</div></div>
+        <div class="badge bg">Caindo há 3 meses · pago integralmente</div>
+        <div class="row"><div class="rn">Fatura mai/26 · vence 26/05<span class="rs">Nunca entrou no rotativo ✅</span></div><div class="rv green">R$5.692</div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Bradesco Amazon Platinum</div><div class="cv green">R$67 ✅</div></div>
+        <div class="badge bg">Praticamente zerado · bem administrado</div>
+        <div class="row"><div class="rn">2 parcelas Amazon em andamento</div><div class="rv green">R$67</div></div>
+      </div>
+    </div>
+    <div style="background:#1e1e1e;border-radius:10px;padding:14px 16px;margin-top:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#e0e0e0;">Total dívidas pessoais</div>
+        <div style="font-size:22px;font-weight:700;color:#ff7070;">R$109.838</div>
+      </div>
+      <div class="row"><span class="rn gray">Consignados folha</span><span class="rv red">R$52.084</span></div>
+      <div class="row"><span class="rn gray">Consignado C/C</span><span class="rv red">R$28.743</span></div>
+      <div class="row"><span class="rn gray">Empréstimo Cenira</span><span class="rv red">R$23.252</span></div>
+      <div class="row"><span class="rn gray">Black (fatura)</span><span class="rv amber">R$5.692</span></div>
+      <div class="row"><span class="rn gray">Bradesco Amazon</span><span class="rv green">R$67</span></div>
+    </div>
+  </div>
+
+  <!-- FLUXO MENSAL -->
+  <div id="diagnostico-fluxo-diag" class="tc">
+    <div class="card">
+      <div class="ch"><div class="ct">💚 Entradas mensais reais</div><div class="cv green">R$5.750</div></div>
+      <div class="badge bg">Corrigido com números reais</div>
+      <div class="row"><span class="rn">Salário líquido Elektro (após INSS, IR, NEOS, saúde, econsignados)</span><span class="rv green">~R$3.400</span></div>
+      <div class="row"><span class="rn">Hugo — renda táxi bruta<span class="rs">R$3.200/mês meta (R$800/semana)</span></span><span class="rv amber">R$3.200</span></div>
+      <div class="row"><span class="rn">(-) Combustível táxi Hugo (custo operacional)<span class="rs">Sai do cartão Black — custo do trabalho</span></span><span class="rv red">-R$850</span></div>
+      <div class="row" style="border-top:1px solid #444;padding-top:10px;"><span class="rn" style="font-weight:700;color:#e0e0e0;">TOTAL ENTRADAS REAIS</span><span class="rv green" style="font-size:15px;">R$5.750</span></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">🔴 Saídas fixas mensais</div><div class="cv red">R$10.974</div></div>
+      <div class="badge br">Comprometimento atual</div>
+      <div class="sec">Escola e educação — R$2.275</div>
+      <div class="row"><div class="rn">Escola Valentina (PAG TIT 199060387000 · vence dia 11)</div><div class="rv red">R$1.249</div></div>
+      <div class="row"><div class="rn">Escola Luca (PAG TIT 001 · vence dia 1)</div><div class="rv red">R$546</div></div>
+      <div class="row"><div class="rn">Van escolar Luca (PIX Guilherme · vence dia 28)</div><div class="rv red">R$480</div></div>
+      <div class="sec">Dívidas — R$2.049</div>
+      <div class="row"><div class="rn">Consignado C/C (32/60)</div><div class="rv red">R$1.403</div></div>
+      <div class="row"><div class="rn">Empréstimo Cenira (a partir 25/06/26)</div><div class="rv red">R$646</div></div>
+      <div class="sec">Casa — R$1.238</div>
+      <div class="row"><div class="rn">Condomínio (PAG TIT 237)</div><div class="rv">R$623</div></div>
+      <div class="row"><div class="rn">CPFL energia</div><div class="rv">R$146</div></div>
+      <div class="row"><div class="rn">SANASA água</div><div class="rv">R$142</div></div>
+      <div class="row"><div class="rn">Claro internet</div><div class="rv">R$145</div></div>
+      <div class="row"><div class="rn">Celular</div><div class="rv">R$74</div></div>
+      <div class="row"><div class="rn">IPTU parcelado</div><div class="rv">R$108</div></div>
+      <div class="sec">Outros — R$660</div>
+      <div class="row"><div class="rn">APE Lockers (guarda móveis)</div><div class="rv">R$223</div></div>
+      <div class="row"><div class="rn">DAS MEI (negócio)</div><div class="rv">R$87</div></div>
+      <div class="row"><div class="rn">Edileia (vaga carro)</div><div class="rv">R$200</div></div>
+      <div class="row"><div class="rn">Nilza (faxina)</div><div class="rv">R$150</div></div>
+      <div class="sec">Fatura Black (estimada) — R$4.753</div>
+      <div class="row"><div class="rn">Parcelamentos em andamento</div><div class="rv amber">R$2.297</div></div>
+      <div class="row"><div class="rn">Rotina (sem combustível Hugo)</div><div class="rv amber">R$2.456</div></div>
+    </div>
+    <div class="abox red">
+      <div class="at">🔴 Déficit mensal: R$5.224</div>
+      <div class="ab">Entradas R$5.750 vs saídas R$10.974. O déficit de R$5.224 está sendo coberto por empréstimos e entradas irregulares. Em fev/27, quando a fatura Black cair para ~R$2.700, o déficit vai a ~R$2.232 — ainda negativo, mas muito mais próximo do equilíbrio.</div>
+    </div>
+    <div class="abox red">
+      <div class="at">🔴 Nova parcela: Mercado Pago R$1.943/mês até nov/26</div>
+      <div class="ab">Empréstimo tomado em mai/26 para cobrir faturas do negócio. Vence dia 16 de cada mês. Some em nov/26 — alivia R$1.943/mês a partir de dez/26. Até lá, aumenta o déficit mensal.</div>
+    </div>
+    <div class="abox amber">
+      <div class="at">⚠️ Salário mai/26 veio R$3.105 — verificar holerite</div>
+      <div class="ab">Esperávamos R$3.400. Diferença de ~R$295 — pode ser desconto extra ou ajuste. Holerite pendente para confirmar.</div>
+    </div>
+  </div>
+
+  <!-- GASTOS -->
+  <div id="diagnostico-gastos" class="tc">
+    <div class="sec">Onde vai o dinheiro todo mês</div>
+    <div class="prog-row"><div class="prog-label">Fatura Black</div><div class="prog-track"><div class="prog-fill" style="width:100%;background:#A32D2D;">R$4.753</div></div><div class="prog-val red">R$4.753</div></div>
+    <div class="prog-row"><div class="prog-label">Escola (2 filhos + van)</div><div class="prog-track"><div class="prog-fill" style="width:48%;background:#378ADD;">R$2.275</div></div><div class="prog-val blue">R$2.275</div></div>
+    <div class="prog-row"><div class="prog-label">Consignado C/C + Cenira</div><div class="prog-track"><div class="prog-fill" style="width:43%;background:#A32D2D;">R$2.049</div></div><div class="prog-val red">R$2.049</div></div>
+    <div class="prog-row"><div class="prog-label">Casa (condo+luz+água+etc)</div><div class="prog-track"><div class="prog-fill" style="width:26%;background:#639922;">R$1.238</div></div><div class="prog-val green">R$1.238</div></div>
+    <div class="prog-row"><div class="prog-label">Outros fixos</div><div class="prog-track"><div class="prog-fill" style="width:14%;background:#EF9F27;">R$660</div></div><div class="prog-val amber">R$660</div></div>
+    <div style="height:12px;"></div>
+    <div class="grid">
+      <div class="card">
+        <div class="ch"><div class="ct">✅ Necessidades — manter</div><div class="cv green">R$5.518</div></div>
+        <div class="badge bg">Não cortar</div>
+        <div class="row"><span class="rn">Escola Valentina</span><span class="rv blue">R$1.249</span></div>
+        <div class="row"><span class="rn">Escola Luca</span><span class="rv blue">R$546</span></div>
+        <div class="row"><span class="rn">Van Luca (Guilherme)</span><span class="rv blue">R$480</span></div>
+        <div class="row"><span class="rn">Contas da casa</span><span class="rv green">R$1.238</span></div>
+        <div class="row"><span class="rn">Almoço trabalho (Dona Terezinha)</span><span class="rv green">~R$288</span></div>
+        <div class="row"><span class="rn">Ortodontia Luca</span><span class="rv blue">R$250</span></div>
+        <div class="row"><span class="rn">Varejão Marcia de Carla</span><span class="rv green">~R$182</span></div>
+        <div class="row"><span class="rn">Seguro carro Tokio Marine</span><span class="rv green">R$286</span></div>
+        <div class="row"><span class="rn">Edileia (vaga) + Nilza (faxina)</span><span class="rv green">R$350</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">⚠️ Avaliar</div><div class="cv amber">R$310</div></div>
+        <div class="badge ba">Possível redução</div>
+        <div class="row"><span class="rn">APE Lockers (R$223 · guardar móveis)<span class="rs">R$2.676/ano — vender móveis ou opção mais barata?</span></span><span class="rv amber">R$223</span></div>
+        <div class="row"><span class="rn">Doações e transferências<span class="rs">R$905/mês · conversa necessária</span></span><span class="rv amber">R$905</span></div>
+        <div class="row"><span class="rn">Assinaturas Apple<span class="rs">~R$80/mês nos meses normais</span></span><span class="rv amber">R$80</span></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">🔴 Parar</div><div class="cv red">~R$166</div></div>
+        <div class="badge br">Eliminar agora</div>
+        <div class="row"><span class="rn">Roupas (União Socorro · 3º mês seguido)</span><span class="rv red">~R$166</span></div>
+        <div class="row"><span class="rn">Novos parcelamentos no cartão</span><span class="rv red">R$0 novos</span></div>
+        <div class="row"><span class="rn">Novos empréstimos</span><span class="rv red">R$0 novos</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESSO -->
+  <div id="diagnostico-progresso" class="tc">
+    <div class="sec">Fatura Black — evolução real</div>
+    <div class="card">
+      <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:12px;">
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">jan/26</div><div style="height:52px;background:#A32D2D;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">6.149</div><div style="font-size:9px;font-weight:700;color:#ff7070;margin-top:3px;">R$6.149</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">fev/26</div><div style="height:78px;background:#A32D2D;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">9.199</div><div style="font-size:9px;font-weight:700;color:#ff7070;margin-top:3px;">R$9.199</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">mar/26</div><div style="height:76px;background:#A32D2D;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">9.039</div><div style="font-size:9px;font-weight:700;color:#ff7070;margin-top:3px;">R$9.039</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">abr/26</div><div style="height:60px;background:#EF9F27;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">7.140</div><div style="font-size:9px;font-weight:700;color:#ffb347;margin-top:3px;">R$7.140</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">mai/26</div><div style="height:46px;background:#639922;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">5.692</div><div style="font-size:9px;font-weight:700;color:#6dbf6d;margin-top:3px;">R$5.692</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">jul/26 est.</div><div style="height:34px;background:#1a3a1a;border:1px dashed #6dbf6d;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#6dbf6d;">4.346</div><div style="font-size:9px;font-weight:700;color:#6dbf6d;margin-top:3px;">~R$4.346</div></div>
+        <div style="flex:1;text-align:center;"><div style="font-size:9px;color:#888;margin-bottom:3px;">fev/27 est.</div><div style="height:22px;background:#1a3a1a;border:1px dashed #6dbf6d;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#6dbf6d;">2.700</div><div style="font-size:9px;font-weight:700;color:#6dbf6d;margin-top:3px;">~R$2.700</div></div>
+      </div>
+      <div class="obs"><div class="dot" style="background:#6dbf6d;"></div><span>Queda de R$3.507 em 3 meses. Sem criar novos parcelamentos, fatura chega em ~R$2.700 em fev/27 automaticamente.</span></div>
+    </div>
+
+    <div class="sec">Alívios automáticos chegando</div>
+    <div class="card">
+      <div class="tl-item"><div class="tl-date green">jun/26</div><div class="tl-body"><div class="tl-desc">CRC termina (parcela 5/5) · Airbnb termina (parcela 6/6) · + 4 outros parcelamentos</div><div class="tl-save green">↓ Fatura cai ~R$1.514/mês · fatura jul estimada: ~R$4.178</div></div></div>
+      <div class="tl-item"><div class="tl-date green">jul/26</div><div class="tl-body"><div class="tl-desc">Decathlon 1 e 2 terminam</div><div class="tl-save green">↓ +R$121 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">out/26</div><div class="tl-body"><div class="tl-desc">Rocha Auto Peças termina</div><div class="tl-save amber">↓ +R$151 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">nov/26</div><div class="tl-body"><div class="tl-desc">Magalu termina</div><div class="tl-save amber">↓ +R$300 liberados</div></div></div>
+      <div class="tl-item"><div class="tl-date amber">dez/26</div><div class="tl-body"><div class="tl-desc">Livelo + Omega terminam · 13º (~R$4.033) + PLR (~R$4.692)</div><div class="tl-save green">↓ +R$173 na fatura · +R$8.725 extras → abater consignado C/C!</div></div></div>
+      <div class="tl-item"><div class="tl-date red">jan/27</div><div class="tl-body"><div class="tl-desc">Kiwify MGDMentori termina — último grande parcelado</div><div class="tl-save green">↓ +R$615 · fatura vira rotina pura: ~R$2.700</div></div></div>
+      <div class="tl-item"><div class="tl-date blue">out/28</div><div class="tl-body"><div class="tl-desc">Econsignado 2 termina (folha)</div><div class="tl-save blue">+R$634/mês no salário líquido permanentemente</div></div></div>
+      <div class="tl-item"><div class="tl-date blue">jun/28</div><div class="tl-body"><div class="tl-desc">Consignado C/C termina (se não abater antes)</div><div class="tl-save blue">+R$1.403/mês na conta permanentemente</div></div></div>
+    </div>
+  </div>
+
+  <!-- PLANO -->
+  <div id="diagnostico-plano" class="tc">
+    <div class="abox amber">
+      <div class="at">⚡ Regra de ouro: não criar novos parcelamentos e não tomar novos empréstimos</div>
+      <div class="ab">A fatura Black vai cair de R$5.692 para ~R$2.700 sozinha até fev/27. Isso reduz o déficit de R$5.224 para ~R$2.232. Cada novo parcelamento repõe o que está terminando e impede a queda.</div>
+    </div>
+    <div class="sec">🔴 Esta semana</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">1.</strong> Cancelar assinaturas Apple desnecessárias<span class="rs">iPhone → Ajustes → seu nome → Assinaturas · economia ~R$400 nos meses de renovação</span></div><div class="rv green">agora</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">2.</strong> Parar compras de roupas<span class="rs">Zero vestuário até fev/27</span></div><div class="rv green">agora</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">3.</strong> Nenhum novo parcelamento no Black<span class="rs">A fatura cai sozinha se não criar novos</span></div><div class="rv green">agora</div></div>
+    </div>
+    <div class="sec">🟡 Este mês</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">4.</strong> Conversar com Hugo sobre a divisão financeira real<span class="rs">Mostrar os números. Hugo recebe R$3.200 brutos e R$850 de combustível sai no cartão dela — formalizar essa divisão.</span></div><div class="rv amber">jun/26</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">5.</strong> Avaliar Lockers APE (R$223/mês)<span class="rs">R$2.676/ano para guardar móveis — vender ou buscar opção mais barata?</span></div><div class="rv amber">jun/26</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">6.</strong> Decidir sobre o negócio Shopee<span class="rs">30 dias para ver resultado. Se seguir no prejuízo, encerrar.</span></div><div class="rv red">jun/26</div></div>
+    </div>
+    <div class="sec">🟢 Dezembro/2026</div>
+    <div class="card">
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">7.</strong> Usar 13º + PLR para abater consignado C/C<span class="rs">~R$8.725 disponíveis · saldo em dez/26 ~R$24k · abatimento libera R$1.403/mês antes de 2028</span></div><div class="rv green">dez/26</div></div>
+    </div>
+    <div class="abox green">
+      <div class="at">✅ O que você já faz certo</div>
+      <div class="ab">Nunca entrou no rotativo do cartão. Fatura Black caindo 3 meses seguidos (-R$3.507). Todas as contas essenciais em dia. Emprego estável com benefícios reais. O problema é estrutural — não irresponsabilidade.</div>
+    </div>
+  </div>
+
+</div><!-- fim diagnostico -->
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SEÇÃO 2: FLUXO DE CAIXA -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="section-fluxo" class="section">
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Entradas confiáveis</div><div class="v green">R$5.750</div></div>
+    <div class="kpi"><div class="l">Déficit estrutural</div><div class="v red">-R$7.167</div><div class="s">com Mercado Pago jun-nov</div></div>
+    <div class="kpi"><div class="l">Saldo hoje 08/06</div><div class="v green">R$5.587 ✅</div></div>
+    <div class="kpi"><div class="l">Mercado Pago novo</div><div class="v red">R$1.943/mês</div><div class="s">até nov/26 · 6 parcelas</div></div>
+    <div class="kpi"><div class="l">Juros conta mai/26</div><div class="v red">-R$233 ⚠️</div><div class="s">evitar em junho</div></div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('fluxo','visao')">📊 Visão geral</button>
+    <button class="tab" onclick="showTab('fluxo','realizado')">✅ Realizado</button>
+    <button class="tab" onclick="showTab('fluxo','junho')">📍 Jun/26 atual</button>
+    <button class="tab" onclick="showTab('fluxo','previsto')">🔮 Previsto</button>
+    <button class="tab" onclick="showTab('fluxo','ciclo')">🔄 O ciclo</button>
+  </div>
+
+  <!-- VISÃO GERAL -->
+  <div id="fluxo-visao" class="tc active">
+    <div class="abox red">
+      <div class="at">🔴 O problema central: salário não cobre as saídas fixas</div>
+      <div class="ab">Entradas reais R$5.750 (Juliane R$3.400 + Hugo líquido R$2.350). Saídas fixas ~R$10.974. Buraco de ~R$5.224/mês — coberto por empréstimos. O mês de abril/26 foi o único mês sem injeção externa: saldo -R$9.003. Esse é o déficit real.</div>
+    </div>
+    <div class="abox amber">
+      <div class="at">⚠️ Meses "positivos" foram salvos por entradas extraordinárias</div>
+      <div class="ab">Fev/26: R$13.000 do negócio Shopee. Mar/26: novo consignado R$8.643 + negócio. Mai/26: empréstimo Cenira R$10.000. Sem essas injeções, todos os meses seriam negativos em ~R$5.000–8.000.</div>
+    </div>
+    <div class="abox green">
+      <div class="at">✅ Boa notícia: o déficit melhora naturalmente até fev/27</div>
+      <div class="ab">Com o fim dos parcelamentos do Black (Airbnb em jun/26, Kiwify em jan/27), a fatura cai de R$5.692 para ~R$2.700. Isso reduz o déficit de R$5.224 para ~R$2.232 — sem nenhuma ação extra, só parando de parcelar.</div>
+    </div>
+    <div class="total-bar">
+      <div class="ti"><div class="tl">Entradas reais</div><div class="tv green">R$5.750</div></div>
+      <div class="ti"><div class="tl">Saídas fixas</div><div class="tv red">R$10.974</div></div>
+      <div class="ti"><div class="tl">Déficit hoje</div><div class="tv red">-R$5.224</div></div>
+      <div class="ti"><div class="tl">Déficit fev/27</div><div class="tv amber">~-R$2.232</div></div>
+    </div>
+  </div>
+
+  <!-- REALIZADO -->
+  <div id="fluxo-realizado" class="tc">
+    <div class="month-grid">
+      <div class="mc">
+        <div class="mh" onclick="tog('jan')">
+          <div class="mh-left"><div class="mn">Janeiro/2026</div><div class="ms">Sem fatura Black ainda · salário dez/25 no saldo</div></div>
+          <div class="mh-right"><div class="mh-saldo green">+R$1.411</div></div>
+          <span class="chev" id="c-jan">▼</span>
+        </div>
+        <div class="mb" id="b-jan">
+          <div class="mb-sec">✅ Entradas R$7.300</div>
+          <div class="row"><span class="rn">Salário + saldo dez/25</span><span class="rv green">R$6.447</span></div>
+          <div class="row"><span class="rn">Outros PIX</span><span class="rv green">R$853</span></div>
+          <div class="mb-sec">🔴 Saídas R$5.889</div>
+          <div class="row"><span class="rn">Consignado C/C + escola + casa + doações</span><span class="rv red">R$5.889</span></div>
+          <div class="mb-total"><span class="green">Saldo</span><span class="green">+R$1.411</span></div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('fev')">
+          <div class="mh-left"><div class="mn">Fevereiro/2026</div><div class="ms">Salvo por R$13k do negócio Shopee</div></div>
+          <div class="mh-right"><div class="mh-saldo green">+R$6.028</div></div>
+          <span class="chev" id="c-fev">▼</span>
+        </div>
+        <div class="mb" id="b-fev">
+          <div class="mb-sec">✅ Entradas R$17.184</div>
+          <div class="row"><span class="rn">Salário líquido</span><span class="rv green">R$3.484</span></div>
+          <div class="row"><span class="rn"><span class="tag" style="background:#2a3a1a;color:#90cc60;">negócio</span>PIX negócio Shopee</span><span class="rv green">R$13.000</span></div>
+          <div class="mb-sec">🔴 Saídas R$11.155</div>
+          <div class="row"><span class="rn"><span class="talert tag">fatura</span>Black jan/26</span><span class="rv red">R$6.149</span></div>
+          <div class="row"><span class="rn">Consignado + escola + casa + outros</span><span class="rv red">R$5.006</span></div>
+          <div class="mb-total"><span class="green">Saldo</span><span class="green">+R$6.028</span></div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('mar')">
+          <div class="mh-left"><div class="mn">Março/2026</div><div class="ms">Salvo por novo consignado R$8.643 + negócio</div></div>
+          <div class="mh-right"><div class="mh-saldo green">+R$11.678</div></div>
+          <span class="chev" id="c-mar">▼</span>
+        </div>
+        <div class="mb" id="b-mar">
+          <div class="mb-sec">✅ Entradas R$31.440</div>
+          <div class="row"><span class="rn">Salário (2 créditos)</span><span class="rv green">R$14.062</span></div>
+          <div class="row"><span class="rn"><span class="tnew tag">empréstimo</span>Novo consignado</span><span class="rv amber">R$8.643</span></div>
+          <div class="row"><span class="rn"><span class="tag" style="background:#2a3a1a;color:#90cc60;">negócio</span>PIX negócio</span><span class="rv green">R$7.513</span></div>
+          <div class="mb-sec">🔴 Saídas R$19.762</div>
+          <div class="row"><span class="rn"><span class="talert tag">fatura</span>Black fev/26</span><span class="rv red">R$8.994</span></div>
+          <div class="row"><span class="rn">Consignado + escola + casa + outros</span><span class="rv red">R$10.768</span></div>
+          <div class="mb-total"><span class="green">Saldo</span><span class="green">+R$11.678</span></div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('abr')">
+          <div class="mh-left"><div class="mn">Abril/2026</div><div class="ms">⚠️ MÊS REAL — sem entrada extra</div></div>
+          <div class="mh-right"><div class="mh-saldo red">-R$9.003</div></div>
+          <span class="chev" id="c-abr">▼</span>
+        </div>
+        <div class="mb" id="b-abr">
+          <div class="mb-sec">✅ Entradas R$4.813 — apenas o normal</div>
+          <div class="row"><span class="rn">Salário líquido</span><span class="rv green">R$3.491</span></div>
+          <div class="row"><span class="rn">Hugo + outros</span><span class="rv green">R$1.322</span></div>
+          <div class="mb-sec">🔴 Saídas R$13.817</div>
+          <div class="row"><span class="rn"><span class="talert tag">fatura</span>Black mar/26</span><span class="rv red">R$7.051</span></div>
+          <div class="row"><span class="rn">Consignado + escola + casa + outros</span><span class="rv red">R$6.766</span></div>
+          <div class="mb-total"><span class="red">Déficit real</span><span class="red">-R$9.003</span></div>
+          <div style="background:#2a0f0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#cc8080;line-height:1.5;">Este é o déficit real sem entradas do negócio ou empréstimos. Saldo chegou a -R$7.718 (cheque especial).</div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('mai')">
+          <div class="mh-left"><div class="mn">Maio/2026</div><div class="ms">Empréstimo Mercado Pago R$14.000 · fatura Black paga · juros conta ⚠️</div></div>
+          <div class="mh-right"><div class="mh-saldo amber">Saldo final ~R$0</div></div>
+          <span class="chev" id="c-mai">▼</span>
+        </div>
+        <div class="mb" id="b-mai">
+          <div class="mb-sec">✅ Entradas confirmadas extrato</div>
+          <div class="row"><span class="rn">Salário líquido (25/05)<span class="rs">⚠️ R$3.105 — menor que esperado · holerite pendente</span></span><span class="rv amber">R$3.105</span></div>
+          <div class="row"><span class="rn">Hugo (PIX 21/05)</span><span class="rv green">R$500</span></div>
+          <div class="row"><span class="rn">PIX Marcos + PIX 62.506 (20/05)<span class="rs">origem a confirmar</span></span><span class="rv green">R$480</span></div>
+          <div class="row"><span class="rn"><span class="tnew tag">empréstimo</span>Mercado Pago (12/05)<span class="rs">6x R$1.943 · vence dia 16 · até nov/26</span></span><span class="rv amber">R$14.000</span></div>
+          <div class="mb-sec">🔴 Saídas confirmadas extrato</div>
+          <div class="row"><span class="rn"><span class="talert tag">fatura</span>Black mai/26 (26/05) ✅ paga</span><span class="rv red">R$5.692</span></div>
+          <div class="row"><span class="rn">Van Guilherme (28/05)</span><span class="rv red">R$480</span></div>
+          <div class="row"><span class="rn">Escola Valentina PAG TIT 199 (11/05)</span><span class="rv red">R$1.249</span></div>
+          <div class="row"><span class="rn">Escola Luca PAG TIT 001 (15/05)</span><span class="rv red">R$546</span></div>
+          <div class="row"><span class="rn">Condomínio PAG TIT 237 (11/05 + 15/05)</span><span class="rv red">R$957</span></div>
+          <div class="row"><span class="rn">CPFL + SANASA (15/05)</span><span class="rv red">R$287</span></div>
+          <div class="row"><span class="rn">Claro celular (20/05)</span><span class="rv red">R$74</span></div>
+          <div class="row"><span class="rn">APE Lockers (25/05)</span><span class="rv red">R$223</span></div>
+          <div class="row"><span class="rn">DAS MEI (20/05)</span><span class="rv red">R$87</span></div>
+          <div class="row"><span class="rn">STIMA contabilidade (18/05)</span><span class="rv red">R$415</span></div>
+          <div class="row"><span class="rn">Nilza faxina (18/05)</span><span class="rv red">R$150</span></div>
+          <div class="row"><span class="rn">Edileia vaga (12/05)</span><span class="rv red">R$200</span></div>
+          <div class="row"><span class="rn">Daniela (27/05)</span><span class="rv red">R$320</span></div>
+          <div class="row"><span class="rn">HUB DO (25/05)<span class="rs">Honorários contador — IRPF 2026 · despesa pessoal única</span></span><span class="rv red">R$180</span></div>
+          <div class="row"><span class="rn"><span class="talert tag">⚠️ ALERTA</span>Juros limite da conta (26/05)<span class="rs">Conta ficou negativa — R$233 de juros pagos</span></span><span class="rv red">R$233</span></div>
+          <div class="row"><span class="rn">Itaú seguro crédito (26/05)</span><span class="rv red">R$15</span></div>
+          <div style="background:#2a0f0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#cc8080;line-height:1.5;">⚠️ Conta ficou negativa antes do salário entrar → gerou R$233 de juros. Evitar isso em junho mantendo reserva mínima.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JUNHO REALIZADO (PARCIAL) -->
+  <div id="fluxo-junho" class="tc">
+    <div class="abox green">
+      <div class="at">✅ Junho começou bem — saldo R$5.587 em 08/06</div>
+      <div class="ab">O empréstimo Mercado Pago R$14.000 (registrado como PIX Juliane 05/06) garantiu o caixa. Fatura Infinite do negócio paga R$3.148 em 01/06. Consignado debitou normalmente. Restam contas ainda por vencer.</div>
+    </div>
+    <div class="mc">
+      <div class="mh" onclick="tog('jun')">
+        <div class="mh-left"><div class="mn">Junho/2026 — parcial até 08/06</div><div class="ms">Saldo atual R$5.587 · contas ainda por vencer</div></div>
+        <div class="mh-right"><div class="mh-saldo green">R$5.587</div></div>
+        <span class="chev" id="c-jun">▼</span>
+      </div>
+      <div class="mb" id="b-jun">
+        <div class="mb-sec">✅ Entradas confirmadas</div>
+        <div class="row"><span class="rn">PIX Juliane (05/06) — Mercado Pago<span class="rs">Empréstimo 6x R$1.943 · vence dia 16</span></span><span class="rv amber">R$14.000</span></div>
+        <div class="row"><span class="rn">PIX Fabio G (01/06)<span class="rs">origem a confirmar</span></span><span class="rv green">R$264</span></div>
+        <div class="row"><span class="rn">PIX Rogerio (31/05)</span><span class="rv green">R$195</span></div>
+        <div class="mb-sec">🔴 Saídas confirmadas até 08/06</div>
+        <div class="row"><span class="rn"><span class="talert tag">negócio</span>Fatura Infinite tráfego pago (01/06)</span><span class="rv red">R$3.148</span></div>
+        <div class="row"><span class="rn">Consignado C/C 33/60 (01/06)</span><span class="rv red">R$1.403</span></div>
+        <div class="row"><span class="rn">Claro (05/06)</span><span class="rv red">R$175</span></div>
+        <div class="row"><span class="rn">BENETTI PIX (05/06)<span class="rs">a identificar</span></span><span class="rv red">R$410</span></div>
+        <div class="row"><span class="rn">IOF (02/06)</span><span class="rv red">R$31</span></div>
+        <div class="row"><span class="rn">Igreja (07/06 + 31/05)</span><span class="rv red">R$100</span></div>
+        <div class="mb-sec">⏳ Ainda por pagar em junho</div>
+        <div class="row"><span class="rn">Escola Luca (dia 15)<span class="rs">PAG TIT 001</span></span><span class="rv amber">R$546</span></div>
+        <div class="row"><span class="rn">Escola Valentina (dia 10)<span class="rs">PAG TIT 199</span></span><span class="rv amber">R$1.249</span></div>
+        <div class="row"><span class="rn">Condomínio (dia 10)</span><span class="rv amber">R$623</span></div>
+        <div class="row"><span class="rn">Van Guilherme (dia 28)</span><span class="rv amber">R$480</span></div>
+        <div class="row"><span class="rn"><span class="tnew tag">NOVO</span>Mercado Pago 1/6 (dia 16)</span><span class="rv red">R$1.943</span></div>
+        <div class="row"><span class="rn">Cenira 1/36 (dia 25)</span><span class="rv red">R$646</span></div>
+        <div class="row"><span class="rn">Salário entra dia 25 →</span><span class="rv green">~R$3.400</span></div>
+        <div style="background:#2a1e00;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#cc9966;line-height:1.5;">⚠️ Pendente: holerite mai/26 (salário veio R$3.105 — desconto a identificar) · detalhes Mercado Pago a confirmar na próxima sessão.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVISTO -->
+  <div id="fluxo-previsto" class="tc">
+    <div class="abox amber">
+      <div class="at">⚠️ Previsão atualizada — nova parcela Mercado Pago incluída</div>
+      <div class="ab">A partir de junho, além do Cenira (R$646), entra o Mercado Pago (R$1.943/mês até nov/26). Isso aumenta o déficit estrutural temporariamente. Em dez/26 o Mercado Pago termina e o cenário melhora.</div>
+    </div>
+    <div class="month-grid">
+      <div class="mc">
+        <div class="mh" onclick="tog('pjun')">
+          <div class="mh-left"><div class="mn">Junho/2026</div><div class="ms">Mercado Pago 1/6 · Cenira 1/36 · CRC termina ✅</div></div>
+          <div class="mh-right"><div class="mh-saldo red">Apertado</div></div>
+          <span class="chev" id="c-pjun">▼</span>
+        </div>
+        <div class="mb" id="b-pjun">
+          <div class="mb-sec">✅ Entradas previstas</div>
+          <div class="row"><span class="rn">Salário (dia 25)</span><span class="rv green">~R$3.400</span></div>
+          <div class="row"><span class="rn">Hugo líquido</span><span class="rv green">~R$2.350</span></div>
+          <div class="mb-sec">🔴 Contas restantes para pagar</div>
+          <div class="row"><span class="rn">Escola Valentina (dia 10)</span><span class="rv red">R$1.249</span></div>
+          <div class="row"><span class="rn">Escola Luca (dia 15)</span><span class="rv red">R$546</span></div>
+          <div class="row"><span class="rn">Condomínio (dia 10)</span><span class="rv red">R$623</span></div>
+          <div class="row"><span class="rn">Van Guilherme (dia 28)</span><span class="rv red">R$480</span></div>
+          <div class="row"><span class="rn"><span class="tnew tag">NOVO</span>Mercado Pago 1/6 (dia 16)</span><span class="rv red">R$1.943</span></div>
+          <div class="row"><span class="rn">Cenira 1/36 (dia 25)</span><span class="rv red">R$646</span></div>
+          <div class="row"><span class="rn">Casa (luz/água/internet/celular)</span><span class="rv red">~R$505</span></div>
+          <div style="background:#0f2a0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#80cc80;line-height:1.5;">✅ CRC termina este mês · Airbnb termina · fatura julho vai cair ~R$1.300</div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('pjul')">
+          <div class="mh-left"><div class="mn">Julho/2026</div><div class="ms">Sem Airbnb na fatura · Mercado Pago 2/6</div></div>
+          <div class="mh-right"><div class="mh-saldo red">Apertado</div></div>
+          <span class="chev" id="c-pjul">▼</span>
+        </div>
+        <div class="mb" id="b-pjul">
+          <div class="mb-sec">✅ Entradas R$5.750</div>
+          <div class="row"><span class="rn">Salário + Hugo líquido</span><span class="rv green">R$5.750</span></div>
+          <div class="mb-sec">🔴 Saídas</div>
+          <div class="row"><span class="rn"><span class="talert tag">fatura</span>Black jun/26 (sem Airbnb!)</span><span class="rv amber">~R$4.178</span></div>
+          <div class="row"><span class="rn">Consignado C/C</span><span class="rv red">R$1.403</span></div>
+          <div class="row"><span class="rn">Cenira 2/36</span><span class="rv red">R$646</span></div>
+          <div class="row"><span class="rn"><span class="tnew tag">NOVO</span>Mercado Pago 2/6 (dia 16)</span><span class="rv red">R$1.943</span></div>
+          <div class="row"><span class="rn">Escola + casa + outros</span><span class="rv">R$3.698</span></div>
+          <div style="background:#0f2a0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#80cc80;line-height:1.5;">✅ Sem Airbnb R$1.133 na fatura — alívio real comparado a junho.</div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('pdez')">
+          <div class="mh-left"><div class="mn">Dezembro/2026</div><div class="ms">13º + PLR · Mercado Pago termina (última parcela nov/26) ✅</div></div>
+          <div class="mh-right"><div class="mh-saldo green">Melhor mês do ano</div></div>
+          <span class="chev" id="c-pdez">▼</span>
+        </div>
+        <div class="mb" id="b-pdez">
+          <div class="mb-sec">✅ Entradas R$12.925</div>
+          <div class="row"><span class="rn">Salário + Hugo líquido</span><span class="rv green">R$5.750</span></div>
+          <div class="row"><span class="rn"><span class="tend tag">extra</span>13º salário líquido</span><span class="rv green">~R$4.033</span></div>
+          <div class="row"><span class="rn"><span class="tend tag">extra</span>PLR estimado</span><span class="rv green">~R$4.692</span></div>
+          <div class="mb-sec">🔴 Saídas + sugestão</div>
+          <div class="row"><span class="rn">Fatura Black + consignado + escola + casa</span><span class="rv red">~R$10.080</span></div>
+          <div class="row"><span class="rn"><span class="tend tag">alívio</span>Mercado Pago terminou em nov/26</span><span class="rv green">-R$1.943/mês a menos ✅</span></div>
+          <div class="row"><span class="rn"><span class="tnew tag">SUGESTÃO</span>Abater consignado C/C com 13º+PLR</span><span class="rv green">~R$8.000</span></div>
+          <div style="background:#0f2a0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#80cc80;line-height:1.5;">Usando R$8.000 para abater o consignado C/C, você libera R$1.403/mês anos antes de 2028. Decisão mais importante do ano.</div>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mh" onclick="tog('pfev27')">
+          <div class="mh-left"><div class="mn">Fevereiro/2027</div><div class="ms">Kiwify termina em jan/27 — fatura vira rotina pura</div></div>
+          <div class="mh-right"><div class="mh-saldo amber">~-R$2.232</div></div>
+          <span class="chev" id="c-pfev27">▼</span>
+        </div>
+        <div class="mb" id="b-pfev27">
+          <div class="mb-sec">✅ Entradas R$5.750</div>
+          <div class="row"><span class="rn">Salário + Hugo líquido</span><span class="rv green">R$5.750</span></div>
+          <div class="mb-sec">🔴 Saídas ~R$7.982</div>
+          <div class="row"><span class="rn">Fatura Black (rotina pura — sem parcelados)</span><span class="rv green">~R$2.700</span></div>
+          <div class="row"><span class="rn">Consignado + Cenira</span><span class="rv red">R$2.049</span></div>
+          <div class="row"><span class="rn">Escola + casa + outros</span><span class="rv">R$3.233</span></div>
+          <div class="mb-total"><span class="amber">Déficit</span><span class="amber">~-R$2.232</span></div>
+          <div style="background:#0f2a0f;border-radius:6px;padding:8px;margin-top:8px;font-size:11px;color:#80cc80;line-height:1.5;">🎯 Se Hugo aumentar contribuição em R$2.232, a conta fecha! Ou o negócio gerando esse valor resolve.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CICLO -->
+  <div id="fluxo-ciclo" class="tc">
+    <div class="abox red">
+      <div class="at">🔴 O ciclo que você identificou</div>
+      <div class="ab">"Os empréstimos que tenho feito são para pagar a fatura do cartão." Exatamente isso. Cada empréstimo para pagar a fatura adiciona uma parcela permanente, que aperta mais o caixa, que força o próximo empréstimo.</div>
+    </div>
+    <div class="ciclo">
+      <div class="ciclo-item red">Fatura alta chega</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">Conta sem saldo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">Toma empréstimo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">+R$646/mês fixo</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">Caixa mais apertado</div>
+      <div class="ciclo-arrow">→</div>
+      <div class="ciclo-item red">Próxima fatura não cabe</div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#e8e8e8;margin-bottom:12px;">Como quebrar o ciclo</div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">1.</strong> Fatura Black abaixo de R$4.000<span class="rs">Está caindo sozinha — não criar novos parcelamentos é suficiente</span></div><div class="rv green">prioridade 1</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">2.</strong> Nenhum novo empréstimo<span class="rs">Cada novo empréstimo = nova parcela permanente = mais pressão</span></div><div class="rv green">prioridade 2</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">3.</strong> Reserva mínima de R$2.000 antes dos vencimentos<span class="rs">Evita cheque especial (7,999%/mês)</span></div><div class="rv green">prioridade 3</div></div>
+      <div class="row"><div class="rn"><strong style="color:#e0e0e0;">4.</strong> 13º + PLR para abater consignado C/C<span class="rs">Libera R$1.403/mês permanentemente</span></div><div class="rv green">dez/26</div></div>
+    </div>
+    <div class="abox green">
+      <div class="at">✅ Em fev/27 o ciclo quebra naturalmente</div>
+      <div class="ab">Fatura ~R$2.700 + consignado R$1.403 + Cenira R$646 = R$4.749 de compromissos. Com R$5.750 de entradas, o déficit cai para R$1.000 — algo que o negócio ou um ajuste pequeno no Hugo cobre. Faltam 9 meses.</div>
+    </div>
+  </div>
+
+</div><!-- fim fluxo -->
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SEÇÃO 3: CENÁRIOS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="section-cenarios" class="section">
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('cenarios','todos')">🔀 Todos os cenários</button>
+    <button class="tab" onclick="showTab('cenarios','black')">💳 Não pagar o Black</button>
+    <button class="tab" onclick="showTab('cenarios','comparativo')">📊 Comparativo</button>
+    <button class="tab" onclick="showTab('cenarios','recomendacao')">🎯 Recomendação</button>
+  </div>
+
+  <!-- TODOS -->
+  <div id="cenarios-todos" class="tc active">
+    <div class="scenario-grid">
+
+      <div class="sc base">
+        <div class="sc-header"><div class="sc-icon">📍</div><div class="sc-title">Situação atual</div><div class="sc-subtitle">Base de comparação — mai/26</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Entradas reais</span><span class="rv green">R$5.750</span></div>
+          <div class="row"><span class="rn">Saídas fixas totais</span><span class="rv red">R$10.974</span></div>
+          <div class="result-box gray-box"><div class="rl">Déficit mensal</div><div class="rv2">-R$5.224</div><div class="rs">Coberto por empréstimos</div></div>
+        </div>
+      </div>
+
+      <div class="sc danger">
+        <div class="sc-header"><div class="sc-icon">💳</div><div class="sc-title">Não pagar o Black</div><div class="sc-subtitle">Parar de pagar a fatura</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Alívio imediato no caixa</span><span class="rv amber">+R$5.692</span></div>
+          <div class="row"><span class="rn">Multa 2% imediata</span><span class="rv red">-R$114</span></div>
+          <div class="row"><span class="rn">Dívida após 3 meses (15,6%/mês)</span><span class="rv red">~R$8.794</span></div>
+          <div class="row"><span class="rn">Dívida após 6 meses</span><span class="rv red">~R$13.584</span></div>
+          <div class="warn-item"><span>⚠️</span>Salário cai no Itaú — banco pode reter automaticamente</div>
+          <div class="warn-item"><span>⚠️</span>Nome negativado em ~30 dias</div>
+          <div class="warn-item"><span>⚠️</span>Impossível crédito futuro</div>
+          <div class="result-box red-box"><div class="rl">Resultado real</div><div class="rv2">Piora</div><div class="rs">Dívida quase dobra em 6 meses</div></div>
+          <div class="verdict nrec">❌ Não recomendado</div>
+        </div>
+      </div>
+
+      <div class="sc positive">
+        <div class="sc-header"><div class="sc-icon">🚖</div><div class="sc-title">Hugo contribui mais</div><div class="sc-subtitle">De R$2.350 para R$3.500 líquido</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Hugo atual (líquido)</span><span class="rv">R$2.350</span></div>
+          <div class="row"><span class="rn">Hugo novo (mais corridas/semana)</span><span class="rv green">R$3.500</span></div>
+          <div class="row"><span class="rn">Diferença mensal</span><span class="rv green">+R$1.150</span></div>
+          <div class="good-item"><span>✅</span>Alívio imediato sem nova dívida</div>
+          <div class="good-item"><span>✅</span>Hugo já tem o equipamento (táxi)</div>
+          <div class="neutral-item"><span>⚠️</span>Depende da demanda de corridas</div>
+          <div class="result-box amber-box"><div class="rl">Novo déficit</div><div class="rv2">-R$4.074</div><div class="rs">Melhora R$1.150/mês</div></div>
+          <div class="verdict maybe">⚠️ Boa alavanca — Hugo já tem o recurso</div>
+        </div>
+      </div>
+
+      <div class="sc positive">
+        <div class="sc-header"><div class="sc-icon">🛍️</div><div class="sc-title">Negócio Shopee lucrativo</div><div class="sc-subtitle">Se gerar R$3.000 líquido/mês</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Entradas atuais</span><span class="rv">R$5.750</span></div>
+          <div class="row"><span class="rn">+ Lucro Shopee</span><span class="rv green">+R$3.000</span></div>
+          <div class="row"><span class="rn">Novas entradas</span><span class="rv green">R$8.750</span></div>
+          <div class="good-item"><span>✅</span>Déficit cai para R$2.224</div>
+          <div class="good-item"><span>✅</span>Combinado com queda da fatura = equilíbrio</div>
+          <div class="neutral-item"><span>⚠️</span>Prazo: 30 dias para ver resultado</div>
+          <div class="result-box amber-box"><div class="rl">Novo déficit</div><div class="rv2">-R$2.224</div><div class="rs">Administrável</div></div>
+          <div class="verdict rec">✅ Resolve pela raiz — aumenta renda</div>
+        </div>
+      </div>
+
+      <div class="sc warning">
+        <div class="sc-header"><div class="sc-icon">💳</div><div class="sc-title">Parcelar a fatura com o Itaú</div><div class="sc-subtitle">Alternativa ao não pagar</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Fatura atual</span><span class="rv">R$5.692</span></div>
+          <div class="row"><span class="rn">Parcelado em 12x pelo banco</span><span class="rv amber">~R$620/mês</span></div>
+          <div class="row"><span class="rn">Juros do parcelamento</span><span class="rv amber">5,99%/mês</span></div>
+          <div class="row"><span class="rn">vs Rotativo</span><span class="rv red">15,6%/mês</span></div>
+          <div class="row"><span class="rn">Nome negativado?</span><span class="rv green">NÃO ✅</span></div>
+          <div class="good-item"><span>✅</span>Alívio imediato de ~R$5.000 no caixa</div>
+          <div class="good-item"><span>✅</span>Nome fica limpo</div>
+          <div class="neutral-item"><span>⚠️</span>Gera juros mas muito menores que rotativo</div>
+          <div class="result-box amber-box"><div class="rl">Uso</div><div class="rv2">Emergência</div><div class="rs">Ligar antes do vencimento 26/05</div></div>
+          <div class="verdict maybe">⚠️ Opção de emergência — não de rotina</div>
+        </div>
+      </div>
+
+      <div class="sc positive">
+        <div class="sc-header"><div class="sc-icon">🎯</div><div class="sc-title">Combinação realista (fev/27)</div><div class="sc-subtitle">Hugo + fatura caindo + negócio</div></div>
+        <div class="sc-body">
+          <div class="row"><span class="rn">Déficit atual</span><span class="rv red">-R$5.224</span></div>
+          <div class="row"><span class="rn">+ Hugo mais corridas</span><span class="rv green">+R$1.150</span></div>
+          <div class="row"><span class="rn">+ Fatura Black cai (fev/27)</span><span class="rv green">+R$2.992</span></div>
+          <div class="row"><span class="rn">+ Negócio gera R$1.000</span><span class="rv green">+R$1.000</span></div>
+          <div class="good-item"><span>✅</span>Déficit vai a ~R$82 — praticamente zero</div>
+          <div class="good-item"><span>✅</span>Nenhuma ação heroica — tudo possível</div>
+          <div class="result-box green-box"><div class="rl">Déficit fev/27</div><div class="rv2">~R$0</div><div class="rs">Equilíbrio real sem empréstimo</div></div>
+          <div class="verdict rec">✅ Caminho mais realista e atingível</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NÃO PAGAR BLACK DETALHADO -->
+  <div id="cenarios-black" class="tc">
+    <div class="abox red">
+      <div class="at">🔴 O maior risco: seu salário cai no Itaú</div>
+      <div class="ab">O consignado C/C é Itaú. A fatura Black é Itaú. O salário cai na conta Itaú. O banco tem direito de reter o saldo para cobrir dívidas vencidas (compensação bancária). Se não pagar a fatura, pode acordar no dia 23 com o salário retido antes de chegar na sua mão.</div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#e8e8e8;margin-bottom:12px;">O que acontece mês a mês</div>
+      <div class="row" style="background:#1a0a0a;padding:8px;border-radius:6px;margin-bottom:6px;"><div class="rn"><strong class="red">Mês 1</strong> — vencimento 26/05 não pago</div><div class="rv red">R$5.692 + multa R$114</div></div>
+      <div style="font-size:11px;color:#cc8080;padding:4px 8px 8px;">Multa 2% imediata. Nome entra no Serasa em ~5 dias úteis.</div>
+      <div class="row" style="background:#1a0a0a;padding:8px;border-radius:6px;margin-bottom:6px;"><div class="rn"><strong class="red">Mês 2</strong> — 30 dias</div><div class="rv red">~R$6.580</div></div>
+      <div style="font-size:11px;color:#cc8080;padding:4px 8px 8px;">Nome negativado. Cartão bloqueado. Cobrança ativa do banco.</div>
+      <div class="row" style="background:#1a0a0a;padding:8px;border-radius:6px;margin-bottom:6px;"><div class="rn"><strong class="red">Mês 3</strong> — 60 dias</div><div class="rv red">~R$7.607</div></div>
+      <div style="font-size:11px;color:#cc8080;padding:4px 8px 8px;">Cobrança judicial possível. Risco de bloqueio de conta.</div>
+      <div class="row" style="background:#1a0a0a;padding:8px;border-radius:6px;margin-bottom:6px;"><div class="rn"><strong class="red">Mês 6</strong> — 5 meses</div><div class="rv red">~R$13.584</div></div>
+      <div style="font-size:11px;color:#cc8080;padding:4px 8px 8px;">Dívida quase dobrou. Restrição de crédito por até 5 anos.</div>
+    </div>
+    <div class="abox amber">
+      <div class="at">⚠️ Versão menos perigosa: parcelar a fatura com o banco</div>
+      <div class="ab">Ligar para o Itaú ANTES do vencimento (26/05) e pedir parcelamento da fatura em 12x. Juros de 5,99%/mês — caros, mas muito menos que 15,6% do rotativo. Nome fica limpo. Alívio imediato de ~R$5.000 no caixa este mês.</div>
+    </div>
+  </div>
+
+  <!-- COMPARATIVO -->
+  <div id="cenarios-comparativo" class="tc">
+    <div style="font-size:12px;color:#888;margin-bottom:14px;">Quanto cada cenário melhora o déficit atual de R$5.224/mês</div>
+    <div class="compare-bar"><div class="cb-label"><span>Situação atual</span><span class="red">-R$5.224</span></div><div class="cb-track"><div class="cb-fill" style="width:100%;background:#A32D2D;">déficit R$5.224</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Não pagar Black (curto prazo)</span><span class="amber">alívio ilusório — dívida dobra em 6 meses</span></div><div class="cb-track"><div class="cb-fill" style="width:10%;background:#6b4400;">perigoso</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Hugo mais corridas (+R$1.150)</span><span class="amber">-R$4.074</span></div><div class="cb-track"><div class="cb-fill" style="width:78%;background:#5a3d00;">melhora R$1.150</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Negócio Shopee R$3.000 lucro</span><span class="amber">-R$2.224</span></div><div class="cb-track"><div class="cb-fill" style="width:43%;background:#2a5a2a;">melhora R$3.000</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Fatura Black em fev/27 (~R$2.700)</span><span class="green">-R$2.232</span></div><div class="cb-track"><div class="cb-fill" style="width:43%;background:#2a5a2a;">melhora R$2.992</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Combinação realista (fev/27)</span><span class="green">~R$0</span></div><div class="cb-track"><div class="cb-fill" style="width:2%;background:#639922;">equilíbrio</div></div></div>
+    <div class="compare-bar"><div class="cb-label"><span>Negócio + combinação + fev/27</span><span class="green">+R$3.000 sobrando</span></div><div class="cb-track"><div class="cb-fill" style="width:57%;background:#639922;">sobra R$3.000/mês</div></div></div>
+  </div>
+
+  <!-- RECOMENDAÇÃO -->
+  <div id="cenarios-recomendacao" class="tc">
+    <div class="abox green">
+      <div class="at">🎯 O caminho mais realista — em ordem</div>
+      <div class="ab">Nenhuma ação isolada resolve. Mas 3-4 ações pequenas combinadas chegam ao equilíbrio em fev/27 sem precisar de novo empréstimo ou inadimplência.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="green">1. Esta semana</strong> — Hugo e você conversam sobre finanças reais<span class="rs">Mostrar esses números. Hugo recebe R$3.200 mas R$850 sai no cartão dela. Meta: Hugo aumentar corridas para R$3.500/semana = R$3.500 líquido real.</span></div><div class="rv green">+R$1.150</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="green">2. Antes de 26/05</strong> — ligar Itaú e pedir parcelamento da fatura Black<span class="rs">Se o caixa não fechar, parcelar em 12x é muito melhor que inadimplir.</span></div><div class="rv green">alívio mai</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="amber">3. Junho</strong> — decidir sobre o negócio Shopee<span class="rs">30 dias para ver lucro real. Se não tiver, encerrar e cortar STIMA R$415 + ads + esforço.</span></div><div class="rv amber">jun/26</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="amber">4. Continuar</strong> — não criar nenhum parcelamento novo<span class="rs">A fatura cai de R$5.692 para R$2.700 sozinha até fev/27. Só não parcelar.</span></div><div class="rv amber">todo mês</div></div>
+      <div class="row" style="padding:8px 0;"><div class="rn"><strong class="blue">5. Dezembro</strong> — 13º + PLR para abater consignado C/C<span class="rs">~R$8.725 livres. Abate o consignado C/C e libera R$1.403/mês a partir de 2027.</span></div><div class="rv blue">dez/26</div></div>
+    </div>
+    <div style="background:#0f2a0f;border-radius:10px;padding:14px 16px;border:1px solid #1a4a1a;">
+      <div style="font-size:13px;font-weight:700;color:#6dbf6d;margin-bottom:10px;">Resultado se fizer 1 + 4 + fatura cair naturalmente</div>
+      <div class="row"><span class="rn">Déficit atual</span><span class="rv red">-R$5.224</span></div>
+      <div class="row"><span class="rn">+ Hugo aumenta corridas</span><span class="rv green">+R$1.150</span></div>
+      <div class="row"><span class="rn">+ Fatura Black cai (fev/27)</span><span class="rv green">+R$2.992</span></div>
+      <div class="row" style="border-top:1px solid #2a5a2a;padding-top:8px;"><span class="rn" style="font-weight:700;color:#e0e0e0;">Déficit fev/27</span><span class="rv green" style="font-size:16px;">-R$1.082</span></div>
+      <div style="font-size:11px;color:#80cc80;margin-top:8px;line-height:1.6;">Se o negócio gerar R$1.000 líquido: a conta fecha no zero. Se gerar R$3.000: sobra R$2.000/mês para quitar dívidas.</div>
+    </div>
+  </div>
+
+</div><!-- fim cenarios -->
+
+</div><!-- wrap -->
+
+<script>
+function showSection(name) {
+  document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showTab(section, name) {
+  const sec = document.getElementById('section-' + section);
+  sec.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  sec.querySelectorAll('.tc').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById(section + '-' + name);
+  if (el) el.classList.add('active');
+  event.target.classList.add('active');
+}
+
+function tog(id) {
+  const b = document.getElementById('b-' + id);
+  const c = document.getElementById('c-' + id);
+  if (b) { const open = b.classList.toggle('open'); if (c) c.classList.toggle('open', open); }
+}
+</script>
+</body>
+</html>
